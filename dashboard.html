@@ -25,17 +25,29 @@
     --border-radius-md: 6px;
     --border-radius-lg: 10px;
   }
+  [data-theme="dark"] {
+    --color-text-primary: #f3f4f6;
+    --color-text-secondary: #9ca3af;
+    --color-text-danger: #f87171;
+    --color-background-primary: #1c1e22;
+    --color-background-secondary: #141517;
+    --color-border-primary: #3a3d44;
+    --color-border-secondary: #2e3138;
+    --color-border-tertiary: #26282e;
+  }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font-sans); font-size: 14px; color: var(--color-text-primary); background: var(--color-background-secondary); }
+  body { font-family: var(--font-sans); font-size: 14px; color: var(--color-text-primary); background: var(--color-background-secondary); transition: background-color .15s, color .15s; }
   .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--color-border-secondary); background: var(--color-background-primary); position: sticky; top: 0; z-index: 100; }
   .logo { font-size: 15px; font-weight: 600; color: var(--color-text-primary); }
   .logo span { color: #1D9E75; }
   .realtime-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #0F6E56; background: #E1F5EE; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
   .realtime-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #1D9E75; animation: pulse 1.5s infinite; display: inline-block; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .theme-toggle { background:none; border:1px solid var(--color-border-secondary); border-radius:8px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:var(--color-text-secondary); font-size:16px; }
+  .theme-toggle:hover { background: var(--color-background-secondary); }
   .content { padding: 20px; max-width: 1200px; margin: 0 auto; }
   .page-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
-  .filter-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; flex-wrap: wrap; }
   .filter-row select { padding: 8px 12px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 13px; font-family: var(--font-sans); background: var(--color-background-primary); color: var(--color-text-primary); }
   .filter-row select:focus { outline: none; border-color: #1D9E75; box-shadow: 0 0 0 2px rgba(29,158,117,0.12); }
   .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
@@ -45,15 +57,28 @@
   .stat-val.danger { color: var(--color-text-danger); }
   .stat-val.success { color: #0F6E56; }
   .card { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); padding: 0; overflow: hidden; }
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
   th { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-border-secondary); color: var(--color-text-secondary); font-weight: 500; font-size: 12px; white-space: nowrap; background: var(--color-background-secondary); }
-  td { padding: 9px 12px; border-bottom: 1px solid var(--color-border-tertiary); vertical-align: middle; }
-  tr:hover td { background: #f9fafb; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--color-border-tertiary); vertical-align: middle; white-space: nowrap; }
+  tr:hover td { background: var(--color-background-secondary); }
   .status-pill { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 500; display: inline-block; }
   .s-reported { background: #E1F5EE; color: #085041; }
   .s-missing { background: #fef2f2; color: #dc2626; }
   .loading-overlay { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--color-text-secondary); gap: 8px; }
-  @media(max-width:700px) { .stat-grid{grid-template-columns:1fr 1fr} }
+  @media(max-width:700px) {
+    .stat-grid{grid-template-columns:1fr 1fr}
+    .content{padding:14px}
+    .page-title{font-size:15px}
+    table{font-size:12px}
+    th, td{padding:7px 8px}
+    .filter-row input[type=date]{width:130px}
+    .stat-val{font-size:19px}
+    .logo{font-size:13px}
+  }
+  @media(max-width:420px) {
+    .stat-grid{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
@@ -62,6 +87,7 @@
   <span class="logo">OTC <span>Evening Reports</span></span>
   <div style="display:flex; align-items:center; gap:10px;">
     <span class="realtime-badge">Live</span>
+    <button class="theme-toggle" id="themeToggle" title="Toggle dark mode"><i class="ti ti-moon"></i></button>
     <a href="admin.html" title="Admin upload" style="color:var(--color-text-secondary); font-size:16px; text-decoration:none;"><i class="ti ti-settings"></i></a>
   </div>
 </div>
@@ -89,10 +115,12 @@
   </div>
 
   <div class="card">
-    <table id="mainTable">
-      <thead><tr><th>SO Name</th><th>HQ</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
-      <tbody id="mainTbody"></tbody>
-    </table>
+    <div class="table-scroll">
+      <table id="mainTable">
+        <thead><tr><th>SO Name</th><th>HQ</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
+        <tbody id="mainTbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -156,6 +184,28 @@ function renderDate(date) {
   }
   tbody.innerHTML = rows;
 }
+
+// ---------- DARK MODE ----------
+(function initTheme() {
+  const saved = localStorage.getItem('otc_theme');
+  const icon = document.querySelector('#themeToggle i');
+  function apply(theme) {
+    if (theme === 'dark') {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      icon.className = 'ti ti-sun';
+    } else {
+      document.documentElement.removeAttribute('data-theme');
+      icon.className = 'ti ti-moon';
+    }
+  }
+  apply(saved === 'dark' ? 'dark' : 'light');
+  document.getElementById('themeToggle').onclick = () => {
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const next = isDark ? 'light' : 'dark';
+    apply(next);
+    localStorage.setItem('otc_theme', next);
+  };
+})();
 
 loadData();
 
