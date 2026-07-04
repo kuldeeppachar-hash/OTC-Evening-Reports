@@ -65,6 +65,7 @@
   .status-pill { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 500; display: inline-block; }
   .s-reported { background: #E1F5EE; color: #085041; }
   .s-missing { background: #fef2f2; color: #dc2626; }
+  .s-vacant { background: var(--color-border-tertiary); color: var(--color-text-secondary); }
   .loading-overlay { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--color-text-secondary); gap: 8px; }
   @media(max-width:700px) {
     .stat-grid{grid-template-columns:1fr 1fr}
@@ -159,13 +160,21 @@ function renderDate(date) {
   const reportedNames = new Set(Object.values(dayReports).map(r => r.so_name).filter(Boolean));
   const rosterNames = Object.keys(roster).sort();
 
-  const reportedCount = rosterNames.filter(n => reportedNames.has(n)).length;
-  const missingCount = rosterNames.length - reportedCount;
+  function status(name) {
+    if (reportedNames.has(name)) return 'reported';
+    const doj = roster[name] && roster[name].doj;
+    if (doj && date < doj) return 'not_yet_joined';
+    return 'missing';
+  }
+
+  const reportedCount = rosterNames.filter(n => status(n) === 'reported').length;
+  const missingCount = rosterNames.filter(n => status(n) === 'missing').length;
+  const notYetJoinedCount = rosterNames.filter(n => status(n) === 'not_yet_joined').length;
   let totalPob = 0;
   Object.values(dayReports).forEach(r => { if (r.pob_done) totalPob += Number(r.pob_done) || 0; });
 
   document.getElementById('kpiBox').innerHTML = `
-    <div class="stat"><div class="stat-label">Total Active SOs</div><div class="stat-val">${rosterNames.length}</div></div>
+    <div class="stat"><div class="stat-label">Total Active SOs</div><div class="stat-val">${rosterNames.length - notYetJoinedCount}</div></div>
     <div class="stat"><div class="stat-label">Reported</div><div class="stat-val success">${reportedCount}</div></div>
     <div class="stat"><div class="stat-label">Missing</div><div class="stat-val danger">${missingCount}</div></div>
     <div class="stat"><div class="stat-label">Total POB</div><div class="stat-val">₹${totalPob.toLocaleString()}</div></div>
@@ -174,10 +183,13 @@ function renderDate(date) {
   const tbody = document.getElementById('mainTbody');
   let rows = '';
   for (const name of rosterNames) {
-    const rec = Object.values(dayReports).find(r => r.so_name === name);
+    const st = status(name);
     const hq = (roster[name] && roster[name].hq) || '-';
-    if (rec) {
+    if (st === 'reported') {
+      const rec = Object.values(dayReports).find(r => r.so_name === name);
       rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-reported">Reported</span></td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
+    } else if (st === 'not_yet_joined') {
+      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-vacant">Not yet joined</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     } else {
       rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-missing">Missing</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     }
@@ -224,14 +236,20 @@ document.getElementById('exportBtn').onclick = () => {
   const rows = [];
   for (const date of datesInRange) {
     const dayReports = allReports[date] || {};
+    const reportedNames = new Set(Object.values(dayReports).map(r => r.so_name).filter(Boolean));
     for (const name of rosterNames) {
       const rec = Object.values(dayReports).find(r => r.so_name === name);
       const hq = (roster[name] && roster[name].hq) || '';
+      const doj = roster[name] && roster[name].doj;
+      let statusLabel;
+      if (reportedNames.has(name)) statusLabel = 'Reported';
+      else if (doj && date < doj) statusLabel = 'Not yet joined';
+      else statusLabel = 'Missing';
       rows.push({
         'Date': date,
         'SO Name': name,
         'HQ': hq,
-        'Status': rec ? 'Reported' : 'Missing',
+        'Status': statusLabel,
         'POB Done': rec && rec.pob_done ? Number(rec.pob_done) : '',
         'Retailers Met': rec && rec.retailers_met ? Number(rec.retailers_met) : '',
         'PC': rec && rec.pc ? Number(rec.pc) : '',

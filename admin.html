@@ -227,6 +227,16 @@ function parseChat(text) {
   return messages;
 }
 
+function excelDDMMYYYYToISO(v) {
+  if (!v) return null;
+  const s = String(v).trim();
+  const parts = s.split(/[\/\-]/);
+  if (parts.length !== 3) return null;
+  let [dd, mm, yy] = parts;
+  if (yy.length === 2) yy = '20' + yy;
+  return `${yy}-${mm.padStart(2,'0')}-${dd.padStart(2,'0')}`;
+}
+
 function loadTeamFromWorkbook(wb) {
   const ws = wb.Sheets['Team List'];
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
@@ -234,7 +244,8 @@ function loadTeamFromWorkbook(wb) {
   const idx = {};
   header.forEach((h, i) => idx[h] = i);
   const exitIdx = idx['Date Of Exit'];
-  const phoneToName = {}, phoneToHQ = {}, nameToPhone = {};
+  const dojIdx = idx['DOJ'];
+  const phoneToName = {}, phoneToHQ = {}, phoneToDOJ = {}, nameToPhone = {};
   const activeSONames = new Set();
   const nonSONameFragments = [];
   for (let r = 1; r < rows.length; r++) {
@@ -246,6 +257,7 @@ function loadTeamFromWorkbook(wb) {
     const cleanName = name.toString().trim();
     phoneToName[digits] = cleanName;
     phoneToHQ[digits] = hq ? hq.toString().trim() : null;
+    phoneToDOJ[digits] = dojIdx != null ? excelDDMMYYYYToISO(row[dojIdx]) : null;
     nameToPhone[cleanName] = digits;
     const exitVal = exitIdx != null ? row[exitIdx] : null;
     const isActive = (exitVal == null || String(exitVal).trim() === '');
@@ -255,7 +267,7 @@ function loadTeamFromWorkbook(wb) {
       nonSONameFragments.push(cleanName.toLowerCase());
     }
   }
-  return { phoneToName, phoneToHQ, nameToPhone, activeSONames, nonSONameFragments };
+  return { phoneToName, phoneToHQ, phoneToDOJ, nameToPhone, activeSONames, nonSONameFragments };
 }
 
 function matchByName(sender, nameToPhone) {
@@ -443,7 +455,7 @@ document.getElementById('pushBtn').onclick = async () => {
     const rosterSnapshot = {};
     for (const name of teamData.activeSONames) {
       const phone = teamData.nameToPhone[name];
-      rosterSnapshot[name] = { hq: teamData.phoneToHQ[phone] || null };
+      rosterSnapshot[name] = { hq: teamData.phoneToHQ[phone] || null, doj: teamData.phoneToDOJ[phone] || null };
     }
     updates['/team_roster'] = rosterSnapshot;
     await db.ref().update(updates);
