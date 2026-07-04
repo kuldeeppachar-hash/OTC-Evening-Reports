@@ -1,36 +1,85 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>OTC Evening Reports Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <style>
-  body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 20px auto; padding: 0 16px; color:#1a1a1a; }
-  h1 { font-size: 20px; }
-  select { padding:6px; margin-bottom: 14px; }
-  table { border-collapse: collapse; width:100%; font-size:13px; }
-  th, td { border:1px solid #ddd; padding:6px 8px; text-align:left; }
-  th { background:#f5f5f5; }
-  tr.missing { background:#ffe9e9; }
-  tr.reported { background:#f0fff4; }
-  .kpi { display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
-  .kpi div { background:#f5f5f5; border-radius:8px; padding:12px 18px; }
-  .kpi b { font-size:20px; display:block; }
+  :root {
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --color-text-primary: #1a1a1a;
+    --color-text-secondary: #6b7280;
+    --color-text-danger: #dc2626;
+    --color-background-primary: #ffffff;
+    --color-background-secondary: #f9fafb;
+    --color-border-primary: #d1d5db;
+    --color-border-secondary: #e5e7eb;
+    --color-border-tertiary: #f3f4f6;
+    --border-radius-sm: 4px;
+    --border-radius-md: 6px;
+    --border-radius-lg: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font-sans); font-size: 14px; color: var(--color-text-primary); background: var(--color-background-secondary); }
+  .topbar { display: flex; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--color-border-secondary); background: var(--color-background-primary); position: sticky; top: 0; z-index: 100; }
+  .logo { font-size: 15px; font-weight: 600; color: var(--color-text-primary); }
+  .logo span { color: #1D9E75; }
+  .realtime-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #0F6E56; background: #E1F5EE; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
+  .realtime-badge::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: #1D9E75; animation: pulse 1.5s infinite; display: inline-block; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .content { padding: 20px; max-width: 1200px; margin: 0 auto; }
+  .page-title { font-size: 17px; font-weight: 600; margin-bottom: 16px; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+  .filter-row select { padding: 8px 12px; border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); font-size: 13px; font-family: var(--font-sans); background: var(--color-background-primary); color: var(--color-text-primary); }
+  .filter-row select:focus { outline: none; border-color: #1D9E75; box-shadow: 0 0 0 2px rgba(29,158,117,0.12); }
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-md); padding: 14px 16px; }
+  .stat-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-val { font-size: 24px; font-weight: 600; }
+  .stat-val.danger { color: var(--color-text-danger); }
+  .stat-val.success { color: #0F6E56; }
+  .card { background: var(--color-background-primary); border: 1px solid var(--color-border-secondary); border-radius: var(--border-radius-lg); padding: 0; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--color-border-secondary); color: var(--color-text-secondary); font-weight: 500; font-size: 12px; white-space: nowrap; background: var(--color-background-secondary); }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--color-border-tertiary); vertical-align: middle; }
+  tr:hover td { background: #f9fafb; }
+  .status-pill { font-size: 11px; padding: 3px 10px; border-radius: 12px; font-weight: 500; display: inline-block; }
+  .s-reported { background: #E1F5EE; color: #085041; }
+  .s-missing { background: #fef2f2; color: #dc2626; }
+  .loading-overlay { display: flex; align-items: center; justify-content: center; padding: 40px; color: var(--color-text-secondary); gap: 8px; }
+  @media(max-width:700px) { .stat-grid{grid-template-columns:1fr 1fr} }
 </style>
 </head>
 <body>
-<h1>OTC Evening Reports — Compliance Dashboard</h1>
 
-<label>Select Date: </label>
-<select id="dateSelect"></select>
+<div class="topbar">
+  <span class="logo">OTC <span>Evening Reports</span></span>
+  <span class="realtime-badge">Live</span>
+</div>
 
-<div class="kpi" id="kpiBox"></div>
+<div class="content">
+  <div class="page-title">Compliance Dashboard</div>
 
-<table id="mainTable">
-  <thead><tr><th>SO Name</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
-  <tbody id="mainTbody"></tbody>
-</table>
+  <div class="filter-row">
+    <select id="dateSelect"></select>
+  </div>
+
+  <div class="stat-grid" id="kpiBox">
+    <div class="loading-overlay"><i class="ti ti-loader-2"></i> Loading…</div>
+  </div>
+
+  <div class="card">
+    <table id="mainTable">
+      <thead><tr><th>SO Name</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
+      <tbody id="mainTbody"></tbody>
+    </table>
+  </div>
+</div>
 
 <script>
 const firebaseConfig = {
@@ -59,6 +108,7 @@ async function loadData() {
   sel.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
   sel.onchange = () => renderDate(sel.value);
   if (dates.length) renderDate(dates[0]);
+  else document.getElementById('kpiBox').innerHTML = '<div class="stat">No data pushed yet.</div>';
 }
 
 function renderDate(date) {
@@ -72,10 +122,10 @@ function renderDate(date) {
   Object.values(dayReports).forEach(r => { if (r.pob_done) totalPob += Number(r.pob_done) || 0; });
 
   document.getElementById('kpiBox').innerHTML = `
-    <div><b>${rosterNames.length}</b>Total Active SOs</div>
-    <div><b>${reportedCount}</b>Reported</div>
-    <div><b>${missingCount}</b>Missing</div>
-    <div><b>${totalPob.toLocaleString()}</b>Total POB</div>
+    <div class="stat"><div class="stat-label">Total Active SOs</div><div class="stat-val">${rosterNames.length}</div></div>
+    <div class="stat"><div class="stat-label">Reported</div><div class="stat-val success">${reportedCount}</div></div>
+    <div class="stat"><div class="stat-label">Missing</div><div class="stat-val danger">${missingCount}</div></div>
+    <div class="stat"><div class="stat-label">Total POB</div><div class="stat-val">₹${totalPob.toLocaleString()}</div></div>
   `;
 
   const tbody = document.getElementById('mainTbody');
@@ -83,9 +133,9 @@ function renderDate(date) {
   for (const name of rosterNames) {
     const rec = Object.values(dayReports).find(r => r.so_name === name);
     if (rec) {
-      rows += `<tr class="reported"><td>${name}</td><td>Reported</td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
+      rows += `<tr><td>${name}</td><td><span class="status-pill s-reported">Reported</span></td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
     } else {
-      rows += `<tr class="missing"><td>${name}</td><td>Missing</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+      rows += `<tr><td>${name}</td><td><span class="status-pill s-missing">Missing</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     }
   }
   tbody.innerHTML = rows;
