@@ -118,13 +118,12 @@ const FIELD_PATTERNS = {
   pob:         /pob\s*done\s*[:\-.]*\s*(\d{1,7})/i,
 };
 
-const KNOWN_NON_SO_PHONES = ['8847236257','8894951016','8580495269'];
-const KNOWN_NON_SO_NAME_FRAGMENTS = ['kuldeep singh','surmukh'];
+const KNOWN_NON_SO_PHONES = ['8847236257','8894951016','8580495269']; // stray numbers not present anywhere in Team List
 
-function isManagerSender(sender, phone) {
+function isManagerSender(sender, phone, nonSONameFragments) {
   const s = sender.toLowerCase();
   if (KNOWN_NON_SO_PHONES.includes(phone)) return true;
-  return KNOWN_NON_SO_NAME_FRAGMENTS.some(f => s.includes(f));
+  return nonSONameFragments.some(f => f && s.includes(f));
 }
 
 function extractPhone(sender) {
@@ -190,6 +189,7 @@ function loadTeamFromWorkbook(wb) {
   const exitIdx = idx['Date Of Exit'];
   const phoneToName = {}, phoneToHQ = {}, nameToPhone = {};
   const activeSONames = new Set();
+  const nonSONameFragments = [];
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row) continue;
@@ -202,9 +202,13 @@ function loadTeamFromWorkbook(wb) {
     nameToPhone[cleanName] = digits;
     const exitVal = exitIdx != null ? row[exitIdx] : null;
     const isActive = (exitVal == null || String(exitVal).trim() === '');
-    if (staffType === 'SO' && isActive) activeSONames.add(cleanName);
+    if (staffType === 'SO' && isActive) {
+      activeSONames.add(cleanName);
+    } else if (staffType !== 'SO') {
+      nonSONameFragments.push(cleanName.toLowerCase());
+    }
   }
-  return { phoneToName, phoneToHQ, nameToPhone, activeSONames };
+  return { phoneToName, phoneToHQ, nameToPhone, activeSONames, nonSONameFragments };
 }
 
 function matchByName(sender, nameToPhone) {
@@ -222,7 +226,7 @@ function processChat(text, team) {
   for (const msg of messages) {
     if (!isEveningReport(msg.body)) continue;
     let phone = extractPhone(msg.sender);
-    if (isManagerSender(msg.sender, phone)) continue;
+    if (isManagerSender(msg.sender, phone, team.nonSONameFragments)) continue;
     const { result: fields, missing } = parseReportBody(msg.body);
     let soName = team.phoneToName[phone];
     let matchedVia = 'phone';
@@ -245,7 +249,7 @@ function processChat(text, team) {
       pc: fields.pc || null,
       pob_done: fields.pob || null,
       missing_fields: missing,
-      is_clean: soName && parsedDateNorm && fields.pob, // priority fields: name, date, POB
+      is_clean: !!(soName && parsedDateNorm && fields.pob), // priority fields: name, date, POB — coerced to strict boolean
     });
   }
   return records;
@@ -330,12 +334,21 @@ document.getElementById('pushBtn').onclick = async () => {
   if (!currentUser) { alert('Sign in first — writes are restricted to the admin account.'); return; }
   const statusEl = document.getElementById('pushStatus');
   statusEl.textContent = 'Pushing…';
+
+  function sanitize(obj) {
+    const out = {};
+    for (const [k, v] of Object.entries(obj)) {
+      out[k] = (v === undefined) ? null : v;
+    }
+    return out;
+  }
+
   try {
     const updates = {};
     for (const r of parsedRecords) {
       if (!r.date) continue; // can't file undated records
       const key = `${r.date}_${r.phone || r.sender_raw.replace(/\W/g,'')}`;
-      updates[`/reports/${r.date}/${r.phone || 'unmatched_' + key}`] = {
+      updates[`/reports/${r.date}/${r.phone || 'unmatched_' + key}`] = sanitize({
         so_name: r.so_name,
         pob_done: r.pob_done,
         retailers_met: r.retailers_met,
@@ -346,7 +359,7 @@ document.getElementById('pushBtn').onclick = async () => {
         is_clean: r.is_clean,
         sender_raw: r.sender_raw,
         uploaded_at: Date.now(),
-      };
+      });
     }
     // roster snapshot
     updates['/team_roster'] = [...teamData.activeSONames].reduce((acc, n) => { acc[n] = true; return acc; }, {});
