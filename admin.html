@@ -38,7 +38,12 @@
 <h1>OTC Evening Reports — Admin Upload</h1>
 <div class="box">
   <div id="authStatus">Checking sign-in status…</div>
-  <button id="signInBtn" style="display:none;">Sign in with Google</button>
+  <div id="signInForm" style="display:none;">
+    <input type="email" id="emailInput" placeholder="Email" style="padding:8px; margin-right:6px; width:220px;">
+    <input type="password" id="passwordInput" placeholder="Password" style="padding:8px; margin-right:6px; width:180px;">
+    <button id="signInBtn">Sign in</button>
+    <div id="loginError" style="color:red; font-size:13px; margin-top:6px;"></div>
+  </div>
   <button id="signOutBtn" class="secondary" style="display:none;">Sign out</button>
 </div>
 
@@ -89,23 +94,36 @@ const auth = firebase.auth();
 
 // ---------- AUTH ----------
 const authStatus = document.getElementById('authStatus');
+const signInForm = document.getElementById('signInForm');
 const signInBtn = document.getElementById('signInBtn');
 const signOutBtn = document.getElementById('signOutBtn');
+const loginError = document.getElementById('loginError');
 let currentUser = null;
 
 auth.onAuthStateChanged(user => {
   currentUser = user;
   if (user) {
     authStatus.textContent = `Signed in as ${user.email} (UID: ${user.uid})`;
-    signInBtn.style.display = 'none';
+    signInForm.style.display = 'none';
     signOutBtn.style.display = 'inline-block';
   } else {
     authStatus.textContent = 'Not signed in. You must sign in to push data (read-only otherwise).';
-    signInBtn.style.display = 'inline-block';
+    signInForm.style.display = 'block';
     signOutBtn.style.display = 'none';
   }
 });
-signInBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+
+signInBtn.onclick = async () => {
+  loginError.textContent = '';
+  const email = document.getElementById('emailInput').value.trim();
+  const password = document.getElementById('passwordInput').value;
+  if (!email || !password) { loginError.textContent = 'Enter both email and password.'; return; }
+  try {
+    await auth.signInWithEmailAndPassword(email, password);
+  } catch (e) {
+    loginError.textContent = 'Sign-in failed: ' + e.message;
+  }
+};
 signOutBtn.onclick = () => auth.signOut();
 
 // ---------- PARSING LOGIC (mirrors parser.py) ----------
