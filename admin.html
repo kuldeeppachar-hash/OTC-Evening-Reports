@@ -368,6 +368,7 @@ document.getElementById('pushBtn').onclick = async () => {
       const key = `${r.date}_${r.phone || r.sender_raw.replace(/\W/g,'')}`;
       updates[`/reports/${r.date}/${r.phone || 'unmatched_' + key}`] = sanitize({
         so_name: r.so_name,
+        hq: teamData.phoneToHQ[r.phone] || null,
         pob_done: r.pob_done,
         retailers_met: r.retailers_met,
         pc: r.pc,
@@ -379,8 +380,13 @@ document.getElementById('pushBtn').onclick = async () => {
         uploaded_at: Date.now(),
       });
     }
-    // roster snapshot
-    updates['/team_roster'] = [...teamData.activeSONames].reduce((acc, n) => { acc[n] = true; return acc; }, {});
+    // roster snapshot — now includes HQ per SO, not just a flat boolean
+    const rosterSnapshot = {};
+    for (const name of teamData.activeSONames) {
+      const phone = teamData.nameToPhone[name];
+      rosterSnapshot[name] = { hq: teamData.phoneToHQ[phone] || null };
+    }
+    updates['/team_roster'] = rosterSnapshot;
     await db.ref().update(updates);
     statusEl.textContent = `Done. ${Object.keys(updates).length - 1} report rows pushed.`;
   } catch (e) {

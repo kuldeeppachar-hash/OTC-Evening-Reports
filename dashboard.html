@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     --font-sans: 'Inter', system-ui, sans-serif;
@@ -72,13 +73,24 @@
     <select id="dateSelect"></select>
   </div>
 
+  <div class="filter-row" style="background:var(--color-background-primary); border:1px solid var(--color-border-secondary); border-radius:var(--border-radius-md); padding:12px 14px;">
+    <label style="font-size:12px; color:var(--color-text-secondary); font-weight:500;">Export range:&nbsp;</label>
+    <input type="date" id="exportFrom" style="padding:7px 10px; border:1px solid var(--color-border-secondary); border-radius:6px; font-family:var(--font-sans); font-size:13px;">
+    <span style="color:var(--color-text-secondary);">to</span>
+    <input type="date" id="exportTo" style="padding:7px 10px; border:1px solid var(--color-border-secondary); border-radius:6px; font-family:var(--font-sans); font-size:13px;">
+    <button id="exportBtn" style="background:#1D9E75; color:#fff; border:none; padding:8px 16px; border-radius:6px; font-size:13px; cursor:pointer; font-family:var(--font-sans);">
+      <i class="ti ti-file-spreadsheet"></i> Export to Excel
+    </button>
+    <span id="exportStatus" style="font-size:12px; color:var(--color-text-secondary);"></span>
+  </div>
+
   <div class="stat-grid" id="kpiBox">
     <div class="loading-overlay"><i class="ti ti-loader-2"></i> Loading…</div>
   </div>
 
   <div class="card">
     <table id="mainTable">
-      <thead><tr><th>SO Name</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
+      <thead><tr><th>SO Name</th><th>HQ</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
       <tbody id="mainTbody"></tbody>
     </table>
   </div>
@@ -135,16 +147,56 @@ function renderDate(date) {
   let rows = '';
   for (const name of rosterNames) {
     const rec = Object.values(dayReports).find(r => r.so_name === name);
+    const hq = (roster[name] && roster[name].hq) || '-';
     if (rec) {
-      rows += `<tr><td>${name}</td><td><span class="status-pill s-reported">Reported</span></td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
+      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-reported">Reported</span></td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
     } else {
-      rows += `<tr><td>${name}</td><td><span class="status-pill s-missing">Missing</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-missing">Missing</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     }
   }
   tbody.innerHTML = rows;
 }
 
 loadData();
+
+document.getElementById('exportBtn').onclick = () => {
+  const statusEl = document.getElementById('exportStatus');
+  const fromVal = document.getElementById('exportFrom').value;
+  const toVal = document.getElementById('exportTo').value;
+  if (!fromVal || !toVal) { statusEl.textContent = 'Pick both dates.'; return; }
+  if (fromVal > toVal) { statusEl.textContent = 'From date must be before To date.'; return; }
+
+  const rosterNames = Object.keys(roster).sort();
+  const datesInRange = Object.keys(allReports).filter(d => d >= fromVal && d <= toVal).sort();
+
+  if (!datesInRange.length) { statusEl.textContent = 'No data in that range.'; return; }
+
+  const rows = [];
+  for (const date of datesInRange) {
+    const dayReports = allReports[date] || {};
+    for (const name of rosterNames) {
+      const rec = Object.values(dayReports).find(r => r.so_name === name);
+      const hq = (roster[name] && roster[name].hq) || '';
+      rows.push({
+        'Date': date,
+        'SO Name': name,
+        'HQ': hq,
+        'Status': rec ? 'Reported' : 'Missing',
+        'POB Done': rec && rec.pob_done ? Number(rec.pob_done) : '',
+        'Retailers Met': rec && rec.retailers_met ? Number(rec.retailers_met) : '',
+        'PC': rec && rec.pc ? Number(rec.pc) : '',
+        'Route': rec && rec.route ? rec.route : '',
+      });
+    }
+  }
+
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws['!cols'] = [{wch:12},{wch:24},{wch:16},{wch:10},{wch:12},{wch:14},{wch:8},{wch:24}];
+  XLSX.utils.book_append_sheet(wb, ws, 'Evening Reports');
+  XLSX.writeFile(wb, `OTC_Evening_Reports_${fromVal}_to_${toVal}.xlsx`);
+  statusEl.textContent = `Exported ${rows.length} rows.`;
+};
 </script>
 </body>
 </html>
