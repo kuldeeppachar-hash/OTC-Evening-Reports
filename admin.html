@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OTC Evening Reports - Admin Upload</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 20px auto; padding: 0 16px; color:#1a1a1a; }
+  h1 { font-size: 20px; }
+  .box { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+  label { display:block; font-weight:600; margin-bottom:6px; }
+  input[type=file] { margin-bottom: 14px; }
+  button { background:#1a73e8; color:white; border:none; padding:10px 16px; border-radius:6px; cursor:pointer; font-size:14px; }
+  button:disabled { background:#aaa; cursor:not-allowed; }
+  button.secondary { background:#555; }
+  table { border-collapse: collapse; width:100%; font-size:13px; margin-top:10px; }
+  th, td { border:1px solid #ddd; padding:6px 8px; text-align:left; }
+  th { background:#f5f5f5; position:sticky; top:0; }
+  tr.clean { background:#f0fff4; }
+  tr.flagged { background:#fff8e1; }
+  tr.duplicate { background:#ffe9e9; }
+  .tabs { margin: 10px 0; }
+  .tabs button { background:#eee; color:#333; margin-right:6px; }
+  .tabs button.active { background:#1a73e8; color:white; }
+  .tabpane { display:none; max-height:500px; overflow:auto; }
+  .tabpane.active { display:block; }
+  .summary { font-size:14px; margin: 10px 0; }
+  .summary b { color:#1a73e8; }
+  #authStatus { font-size: 13px; color:#666; }
+  .missing-list { background:#fff3f3; border:1px solid #f5c2c2; padding:10px; border-radius:6px; }
+</style>
+</head>
+<body>
+
+<h1>OTC Evening Reports — Admin Upload</h1>
+<div class="box">
+  <div id="authStatus">Checking sign-in status…</div>
+  <button id="signInBtn" style="display:none;">Sign in with Google</button>
+  <button id="signOutBtn" class="secondary" style="display:none;">Sign out</button>
+</div>
+
+<div class="box">
+  <label>Master Data Sheet (.xlsx — must contain "Team List" sheet)</label>
+  <input type="file" id="masterFile" accept=".xlsx">
+
+  <label>WhatsApp Chat Export(s) (.txt — you can select multiple)</label>
+  <input type="file" id="chatFiles" accept=".txt" multiple>
+
+  <br>
+  <button id="parseBtn">Parse &amp; Preview</button>
+</div>
+
+<div class="box" id="resultsBox" style="display:none;">
+  <div class="summary" id="summaryText"></div>
+
+  <div class="missing-list" id="missingBox" style="display:none;"></div>
+
+  <div class="tabs">
+    <button class="tabbtn active" data-tab="clean">Clean</button>
+    <button class="tabbtn" data-tab="flagged">Flagged (needs review)</button>
+    <button class="tabbtn" data-tab="all">All records</button>
+  </div>
+
+  <div class="tabpane active" id="tab-clean"></div>
+  <div class="tabpane" id="tab-flagged"></div>
+  <div class="tabpane" id="tab-all"></div>
+
+  <br>
+  <button id="pushBtn" disabled>Push to Firebase</button>
+  <span id="pushStatus" style="margin-left:10px; font-size:13px;"></span>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCyGVJtBL4mk0bdTUxN9_SaiM4gwZhdb6k",
+  authDomain: "otc-evening-reports.firebaseapp.com",
+  databaseURL: "https://otc-evening-reports-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "otc-evening-reports",
+  storageBucket: "otc-evening-reports.firebasestorage.app",
+  messagingSenderId: "287698321424",
+  appId: "1:287698321424:web:a9a618c8fc8386eca5ca95"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+// ---------- AUTH ----------
+const authStatus = document.getElementById('authStatus');
+const signInBtn = document.getElementById('signInBtn');
+const signOutBtn = document.getElementById('signOutBtn');
+let currentUser = null;
+
+auth.onAuthStateChanged(user => {
+  currentUser = user;
+  if (user) {
+    authStatus.textContent = `Signed in as ${user.email} (UID: ${user.uid})`;
+    signInBtn.style.display = 'none';
+    signOutBtn.style.display = 'inline-block';
+  } else {
+    authStatus.textContent = 'Not signed in. You must sign in to push data (read-only otherwise).';
+    signInBtn.style.display = 'inline-block';
+    signOutBtn.style.display = 'none';
+  }
+});
+signInBtn.onclick = () => auth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+signOutBtn.onclick = () => auth.signOut();
+
+// ---------- PARSING LOGIC (mirrors parser.py) ----------
+const FIELD_PATTERNS = {
+  date:        /(?:date|data)\s*[:\-]*\s*([0-3]?\d[\/\-][01]?\d[\/\-]\d{2,4})/i,
+  working_with: /working\s*with\s*[:\-]*\s*([A-Za-z][A-Za-z .]{2,40})/i,
+  route:       /(?:working\s*route|route)\s*[:\-]*\s*([A-Za-z0-9][A-Za-z0-9 ,.]{2,60})/i,
+  retailers:   /(?:no\.?\s*retailers?\s*met|retailers?\s*met)\s*[:\-.]*\s*(\d{1,4})/i,
+  pc:          /\bpc\s*[:\-]*\s*(\d{1,4})/i,
+  pob:         /pob\s*done\s*[:\-.]*\s*(\d{1,7})/i,
+};
+
+const KNOWN_NON_SO_PHONES = ['8847236257','8894951016','8580495269'];
+const KNOWN_NON_SO_NAME_FRAGMENTS = ['kuldeep singh','surmukh'];
+
+function isManagerSender(sender, phone) {
+  const s = sender.toLowerCase();
+  if (KNOWN_NON_SO_PHONES.includes(phone)) return true;
+  return KNOWN_NON_SO_NAME_FRAGMENTS.some(f => s.includes(f));
+}
+
+function extractPhone(sender) {
+  const digits = sender.replace(/\D/g, '');
+  if (digits.length >= 10) return digits.slice(-10);
+  return null;
+}
+
+function normDate(d) {
+  if (!d) return null;
+  d = d.replace(/\./g, '/').replace(/-/g, '/');
+  const parts = d.split('/');
+  if (parts.length !== 3) return null;
+  let [dd, mm, yy] = parts;
+  if (yy.length === 2) yy = '20' + yy;
+  dd = dd.padStart(2,'0'); mm = mm.padStart(2,'0');
+  if (yy.length !== 4) return null;
+  return `${yy}-${mm}-${dd}`;
+}
+
+function parseReportBody(body) {
+  const lines = body.split('\n');
+  const result = {};
+  const missing = [];
+  for (const [field, pattern] of Object.entries(FIELD_PATTERNS)) {
+    let found = null;
+    for (const line of lines) {
+      const m = line.match(pattern);
+      if (m) {
+        const val = m[1].trim().replace(/^[:\-. ]+|[:\-. ]+$/g, '');
+        if (val) { found = val; break; }
+      }
+    }
+    if (found) result[field] = found; else missing.push(field);
+  }
+  return { result, missing };
+}
+
+function isEveningReport(body) {
+  return /evening\s*report/i.test(body);
+}
+
+function parseChat(text) {
+  const msgPattern = /(\d{1,2}\/\d{1,2}\/\d{2}), (\d{1,2}:\d{2}\s?[ap]m) - ([^:]+): /gi;
+  const matches = [...text.matchAll(msgPattern)];
+  const messages = [];
+  for (let i = 0; i < matches.length; i++) {
+    const m = matches[i];
+    const start = m.index + m[0].length;
+    const end = i + 1 < matches.length ? matches[i+1].index : text.length;
+    const body = text.slice(start, end).trim();
+    messages.push({ date: m[1], time: m[2], sender: m[3].trim(), body });
+  }
+  return messages;
+}
+
+function loadTeamFromWorkbook(wb) {
+  const ws = wb.Sheets['Team List'];
+  const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null });
+  const header = rows[0].map(h => (h || '').toString().trim());
+  const idx = {};
+  header.forEach((h, i) => idx[h] = i);
+  const exitIdx = idx['Date Of Exit'];
+  const phoneToName = {}, phoneToHQ = {}, nameToPhone = {};
+  const activeSONames = new Set();
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row) continue;
+    const name = row[idx['Name']], hq = row[idx['Head Qtr.']], mobile = row[idx['Mobile']], staffType = row[idx['Staff Type']];
+    if (mobile == null || !name) continue;
+    const digits = String(mobile).replace(/\D/g,'').slice(-10);
+    const cleanName = name.toString().trim();
+    phoneToName[digits] = cleanName;
+    phoneToHQ[digits] = hq ? hq.toString().trim() : null;
+    nameToPhone[cleanName] = digits;
+    const exitVal = exitIdx != null ? row[exitIdx] : null;
+    const isActive = (exitVal == null || String(exitVal).trim() === '');
+    if (staffType === 'SO' && isActive) activeSONames.add(cleanName);
+  }
+  return { phoneToName, phoneToHQ, nameToPhone, activeSONames };
+}
+
+function matchByName(sender, nameToPhone) {
+  const s = sender.toLowerCase();
+  for (const [masterName, phone] of Object.entries(nameToPhone)) {
+    const tokens = masterName.toLowerCase().split(' ');
+    if (tokens.length && tokens.every(t => s.includes(t))) return phone;
+  }
+  return null;
+}
+
+function processChat(text, team) {
+  const messages = parseChat(text);
+  const records = [];
+  for (const msg of messages) {
+    if (!isEveningReport(msg.body)) continue;
+    let phone = extractPhone(msg.sender);
+    if (isManagerSender(msg.sender, phone)) continue;
+    const { result: fields, missing } = parseReportBody(msg.body);
+    let soName = team.phoneToName[phone];
+    let matchedVia = 'phone';
+    if (!soName) {
+      const fb = matchByName(msg.sender, team.nameToPhone);
+      if (fb) { phone = fb; soName = team.phoneToName[fb]; matchedVia = 'name_fallback'; }
+    }
+    const parsedDateNorm = normDate(fields.date);
+    records.push({
+      sender_raw: msg.sender,
+      phone,
+      so_name: soName || null,
+      matched: !!soName,
+      matched_via: soName ? matchedVia : null,
+      date_raw: fields.date || null,
+      date: parsedDateNorm,
+      working_with: fields.working_with || null,
+      route: fields.route || null,
+      retailers_met: fields.retailers || null,
+      pc: fields.pc || null,
+      pob_done: fields.pob || null,
+      missing_fields: missing,
+      is_clean: soName && parsedDateNorm && fields.pob, // priority fields: name, date, POB
+    });
+  }
+  return records;
+}
+
+// ---------- UI WIRING ----------
+let parsedRecords = [];
+let teamData = null;
+
+document.getElementById('parseBtn').onclick = async () => {
+  const masterInput = document.getElementById('masterFile');
+  const chatInput = document.getElementById('chatFiles');
+  if (!masterInput.files[0]) { alert('Upload the master data sheet first.'); return; }
+  if (!chatInput.files.length) { alert('Upload at least one chat export file.'); return; }
+
+  const masterBuf = await masterInput.files[0].arrayBuffer();
+  const wb = XLSX.read(masterBuf, { type: 'array' });
+  teamData = loadTeamFromWorkbook(wb);
+
+  let allRecords = [];
+  for (const file of chatInput.files) {
+    const text = await file.text();
+    allRecords = allRecords.concat(processChat(text, teamData));
+  }
+  parsedRecords = allRecords;
+  renderResults();
+};
+
+function renderResults() {
+  document.getElementById('resultsBox').style.display = 'block';
+  const clean = parsedRecords.filter(r => r.is_clean);
+  const flagged = parsedRecords.filter(r => !r.is_clean);
+
+  document.getElementById('summaryText').innerHTML =
+    `Total evening reports parsed: <b>${parsedRecords.length}</b> &nbsp;|&nbsp; ` +
+    `Clean (name+date+POB confirmed): <b>${clean.length}</b> &nbsp;|&nbsp; ` +
+    `Flagged for review: <b>${flagged.length}</b>`;
+
+  // zero-report check
+  const seenNames = new Set(parsedRecords.filter(r => r.matched).map(r => r.so_name));
+  const missing = [...teamData.activeSONames].filter(n => !seenNames.has(n)).sort();
+  const missingBox = document.getElementById('missingBox');
+  if (missing.length) {
+    missingBox.style.display = 'block';
+    missingBox.innerHTML = `<b>Zero reports found for ${missing.length} active SO(s) in this upload:</b><br>` +
+      missing.map(n => `- ${n}`).join('<br>') +
+      `<br><br><i>Note: this reflects only the file(s) uploaded just now, not full history.</i>`;
+  } else {
+    missingBox.style.display = 'none';
+  }
+
+  function renderTable(records) {
+    if (!records.length) return '<p>No records.</p>';
+    let html = '<table><tr><th>Sender</th><th>SO Name</th><th>Date</th><th>POB</th><th>Retailers</th><th>PC</th><th>Route</th><th>Missing</th></tr>';
+    for (const r of records) {
+      const cls = r.is_clean ? 'clean' : 'flagged';
+      html += `<tr class="${cls}"><td>${r.sender_raw}</td><td>${r.so_name || '<b style="color:red">UNMATCHED</b>'}</td>` +
+        `<td>${r.date || '-'}</td><td>${r.pob_done || '-'}</td><td>${r.retailers_met || '-'}</td>` +
+        `<td>${r.pc || '-'}</td><td>${r.route || '-'}</td><td>${r.missing_fields.join(', ')}</td></tr>`;
+    }
+    html += '</table>';
+    return html;
+  }
+
+  document.getElementById('tab-clean').innerHTML = renderTable(clean);
+  document.getElementById('tab-flagged').innerHTML = renderTable(flagged);
+  document.getElementById('tab-all').innerHTML = renderTable(parsedRecords);
+
+  document.getElementById('pushBtn').disabled = false;
+}
+
+document.querySelectorAll('.tabbtn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.tabbtn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tabpane').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  };
+});
+
+document.getElementById('pushBtn').onclick = async () => {
+  if (!currentUser) { alert('Sign in first — writes are restricted to the admin account.'); return; }
+  const statusEl = document.getElementById('pushStatus');
+  statusEl.textContent = 'Pushing…';
+  try {
+    const updates = {};
+    for (const r of parsedRecords) {
+      if (!r.date) continue; // can't file undated records
+      const key = `${r.date}_${r.phone || r.sender_raw.replace(/\W/g,'')}`;
+      updates[`/reports/${r.date}/${r.phone || 'unmatched_' + key}`] = {
+        so_name: r.so_name,
+        pob_done: r.pob_done,
+        retailers_met: r.retailers_met,
+        pc: r.pc,
+        route: r.route,
+        working_with: r.working_with,
+        matched: r.matched,
+        is_clean: r.is_clean,
+        sender_raw: r.sender_raw,
+        uploaded_at: Date.now(),
+      };
+    }
+    // roster snapshot
+    updates['/team_roster'] = [...teamData.activeSONames].reduce((acc, n) => { acc[n] = true; return acc; }, {});
+    await db.ref().update(updates);
+    statusEl.textContent = `Done. ${Object.keys(updates).length - 1} report rows pushed.`;
+  } catch (e) {
+    statusEl.textContent = 'Error: ' + e.message;
+  }
+};
+</script>
+</body>
+</html>

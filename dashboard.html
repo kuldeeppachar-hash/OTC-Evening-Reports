@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>OTC Evening Reports Dashboard</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 1100px; margin: 20px auto; padding: 0 16px; color:#1a1a1a; }
+  h1 { font-size: 20px; }
+  select { padding:6px; margin-bottom: 14px; }
+  table { border-collapse: collapse; width:100%; font-size:13px; }
+  th, td { border:1px solid #ddd; padding:6px 8px; text-align:left; }
+  th { background:#f5f5f5; }
+  tr.missing { background:#ffe9e9; }
+  tr.reported { background:#f0fff4; }
+  .kpi { display:flex; gap:16px; margin-bottom:16px; flex-wrap:wrap; }
+  .kpi div { background:#f5f5f5; border-radius:8px; padding:12px 18px; }
+  .kpi b { font-size:20px; display:block; }
+</style>
+</head>
+<body>
+<h1>OTC Evening Reports — Compliance Dashboard</h1>
+
+<label>Select Date: </label>
+<select id="dateSelect"></select>
+
+<div class="kpi" id="kpiBox"></div>
+
+<table id="mainTable">
+  <thead><tr><th>SO Name</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
+  <tbody id="mainTbody"></tbody>
+</table>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCyGVJtBL4mk0bdTUxN9_SaiM4gwZhdb6k",
+  authDomain: "otc-evening-reports.firebaseapp.com",
+  databaseURL: "https://otc-evening-reports-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "otc-evening-reports",
+  storageBucket: "otc-evening-reports.firebasestorage.app",
+  messagingSenderId: "287698321424",
+  appId: "1:287698321424:web:a9a618c8fc8386eca5ca95"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let roster = {};
+let allReports = {};
+
+async function loadData() {
+  const rosterSnap = await db.ref('/team_roster').get();
+  roster = rosterSnap.val() || {};
+  const reportsSnap = await db.ref('/reports').get();
+  allReports = reportsSnap.val() || {};
+
+  const dates = Object.keys(allReports).sort().reverse();
+  const sel = document.getElementById('dateSelect');
+  sel.innerHTML = dates.map(d => `<option value="${d}">${d}</option>`).join('');
+  sel.onchange = () => renderDate(sel.value);
+  if (dates.length) renderDate(dates[0]);
+}
+
+function renderDate(date) {
+  const dayReports = allReports[date] || {};
+  const reportedNames = new Set(Object.values(dayReports).map(r => r.so_name).filter(Boolean));
+  const rosterNames = Object.keys(roster).sort();
+
+  const reportedCount = rosterNames.filter(n => reportedNames.has(n)).length;
+  const missingCount = rosterNames.length - reportedCount;
+  let totalPob = 0;
+  Object.values(dayReports).forEach(r => { if (r.pob_done) totalPob += Number(r.pob_done) || 0; });
+
+  document.getElementById('kpiBox').innerHTML = `
+    <div><b>${rosterNames.length}</b>Total Active SOs</div>
+    <div><b>${reportedCount}</b>Reported</div>
+    <div><b>${missingCount}</b>Missing</div>
+    <div><b>${totalPob.toLocaleString()}</b>Total POB</div>
+  `;
+
+  const tbody = document.getElementById('mainTbody');
+  let rows = '';
+  for (const name of rosterNames) {
+    const rec = Object.values(dayReports).find(r => r.so_name === name);
+    if (rec) {
+      rows += `<tr class="reported"><td>${name}</td><td>Reported</td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
+    } else {
+      rows += `<tr class="missing"><td>${name}</td><td>Missing</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+    }
+  }
+  tbody.innerHTML = rows;
+}
+
+loadData();
+</script>
+</body>
+</html>
