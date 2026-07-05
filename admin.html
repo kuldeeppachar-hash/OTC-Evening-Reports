@@ -49,8 +49,13 @@
 
 <div class="box">
   <label>Master Data Sheet (.xlsx — must contain "Team List" sheet)</label>
+  <div id="masterStatus" style="font-size:13px; color:#666; margin-bottom:8px;">Checking for saved master data…</div>
   <input type="file" id="masterFile" accept=".xlsx">
+  <button id="uploadMasterBtn" style="margin-left:6px;">Save Master Data</button>
+  <div id="masterUploadStatus" style="font-size:13px; margin-top:6px;"></div>
+</div>
 
+<div class="box">
   <label>WhatsApp Chat Export(s) (.txt — you can select multiple)</label>
   <input type="file" id="chatFiles" accept=".txt" multiple>
 
@@ -322,15 +327,73 @@ function processChat(text, team) {
 let parsedRecords = [];
 let teamData = null;
 
-document.getElementById('parseBtn').onclick = async () => {
-  const masterInput = document.getElementById('masterFile');
-  const chatInput = document.getElementById('chatFiles');
-  if (!masterInput.files[0]) { alert('Upload the master data sheet first.'); return; }
-  if (!chatInput.files.length) { alert('Upload at least one chat export file.'); return; }
+function serializeTeamData(td) {
+  return {
+    phoneToName: td.phoneToName,
+    phoneToHQ: td.phoneToHQ,
+    phoneToDOJ: td.phoneToDOJ,
+    nameToPhone: td.nameToPhone,
+    activeSONames: [...td.activeSONames],
+    nonSONameFragments: td.nonSONameFragments,
+    saved_at: Date.now(),
+  };
+}
 
-  const masterBuf = await masterInput.files[0].arrayBuffer();
-  const wb = XLSX.read(masterBuf, { type: 'array' });
-  teamData = loadTeamFromWorkbook(wb);
+function deserializeTeamData(obj) {
+  return {
+    phoneToName: obj.phoneToName || {},
+    phoneToHQ: obj.phoneToHQ || {},
+    phoneToDOJ: obj.phoneToDOJ || {},
+    nameToPhone: obj.nameToPhone || {},
+    activeSONames: new Set(obj.activeSONames || []),
+    nonSONameFragments: obj.nonSONameFragments || [],
+  };
+}
+
+async function loadCachedMasterData() {
+  const statusEl = document.getElementById('masterStatus');
+  try {
+    const snap = await db.ref('/master_team_data').get();
+    if (snap.exists()) {
+      const data = snap.val();
+      teamData = deserializeTeamData(data);
+      const savedDate = data.saved_at ? new Date(data.saved_at).toLocaleString() : 'unknown time';
+      statusEl.textContent = `Using saved master data (last saved: ${savedDate}, ${teamData.activeSONames.size} active SOs). Upload a new file only if the roster changed.`;
+      statusEl.style.color = '#0F6E56';
+    } else {
+      statusEl.textContent = 'No saved master data found. Upload the sheet once to get started.';
+      statusEl.style.color = '#b45309';
+    }
+  } catch (e) {
+    statusEl.textContent = 'Could not check saved master data: ' + e.message;
+    statusEl.style.color = 'red';
+  }
+}
+loadCachedMasterData();
+
+document.getElementById('uploadMasterBtn').onclick = async () => {
+  const uploadStatus = document.getElementById('masterUploadStatus');
+  const masterInput = document.getElementById('masterFile');
+  if (!masterInput.files[0]) { uploadStatus.textContent = 'Choose a file first.'; uploadStatus.style.color='red'; return; }
+  if (!currentUser) { uploadStatus.textContent = 'Sign in first — saving master data requires admin write access.'; uploadStatus.style.color='red'; return; }
+  try {
+    const buf = await masterInput.files[0].arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    teamData = loadTeamFromWorkbook(wb);
+    await db.ref('/master_team_data').set(serializeTeamData(teamData));
+    uploadStatus.textContent = `Saved. ${teamData.activeSONames.size} active SOs now cached — you won't need to re-upload this until the roster changes.`;
+    uploadStatus.style.color = '#0F6E56';
+    document.getElementById('masterStatus').textContent = `Using saved master data (just updated, ${teamData.activeSONames.size} active SOs).`;
+  } catch (e) {
+    uploadStatus.textContent = 'Error saving master data: ' + e.message;
+    uploadStatus.style.color = 'red';
+  }
+};
+
+document.getElementById('parseBtn').onclick = async () => {
+  const chatInput = document.getElementById('chatFiles');
+  if (!teamData) { alert('No master data available yet. Upload and save the master sheet at least once.'); return; }
+  if (!chatInput.files.length) { alert('Upload at least one chat export file.'); return; }
 
   let allRecords = [];
   for (const file of chatInput.files) {
