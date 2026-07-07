@@ -141,7 +141,7 @@ const FIELD_PATTERNS = {
   pob:         /pob\s*done\s*[:\-.]*\s*(\d{1,7})/i,
 };
 
-const KNOWN_NON_SO_PHONES = ['8847236257','8894951016','8580495269']; // stray numbers not present anywhere in Team List
+const KNOWN_NON_SO_PHONES = ['8894951016','8580495269']; // stray numbers not present anywhere in Team List
 
 function isManagerSender(sender, phone, nonSONameFragments) {
   const s = sender.toLowerCase();
@@ -250,7 +250,6 @@ function loadTeamFromWorkbook(wb) {
   header.forEach((h, i) => idx[h] = i);
   const exitIdx = idx['Date Of Exit'];
   const dojIdx = idx['DOJ'];
-  const mobile2Idx = idx['Mobile2'];
   const phoneToName = {}, phoneToHQ = {}, phoneToDOJ = {}, nameToPhone = {};
   const activeSONames = new Set();
   const nonSONameFragments = [];
@@ -264,19 +263,7 @@ function loadTeamFromWorkbook(wb) {
     phoneToName[digits] = cleanName;
     phoneToHQ[digits] = hq ? hq.toString().trim() : null;
     phoneToDOJ[digits] = dojIdx != null ? excelDDMMYYYYToISO(row[dojIdx]) : null;
-    nameToPhone[cleanName] = digits; // primary number stays the canonical lookup for pushes
-
-    // secondary number, if present, resolves to the same SO identity
-    const mobile2 = mobile2Idx != null ? row[mobile2Idx] : null;
-    if (mobile2) {
-      const digits2 = String(mobile2).replace(/\D/g,'').slice(-10);
-      if (digits2 && digits2 !== digits) {
-        phoneToName[digits2] = cleanName;
-        phoneToHQ[digits2] = phoneToHQ[digits];
-        phoneToDOJ[digits2] = phoneToDOJ[digits];
-      }
-    }
-
+    nameToPhone[cleanName] = digits;
     const exitVal = exitIdx != null ? row[exitIdx] : null;
     const isActive = (exitVal == null || String(exitVal).trim() === '');
     if (staffType === 'SO' && isActive) {
