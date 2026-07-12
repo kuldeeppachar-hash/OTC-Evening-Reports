@@ -115,6 +115,21 @@
 
     <label class="field-label">Date</label>
     <input type="date" id="reportDate">
+
+    <label class="field-label">Headquarter (HQ)</label>
+    <input type="text" id="hqDisplay" readonly placeholder="Auto-fills once you select your name" style="background:var(--c-bg); color:var(--c-text-secondary);">
+  </div>
+
+  <div class="step">
+    <div class="step-label">Worked With</div>
+    <select id="workedWithSelect">
+      <option value="alone">Alone</option>
+      <option value="asm">ASM</option>
+      <option value="rsm">RSM</option>
+      <option value="zsm">ZSM</option>
+      <option value="others">Others</option>
+    </select>
+    <input type="text" id="workedWithName" placeholder="Enter name" style="display:none; margin-top:10px;">
   </div>
 
   <div class="step">
@@ -317,6 +332,19 @@ document.getElementById('soSelect').onchange = () => {
     const dl = block.querySelector('datalist');
     dl.innerHTML = currentTownOptionsHTML(document.getElementById('soSelect').value);
   });
+  const so = soByCode[document.getElementById('soSelect').value];
+  document.getElementById('hqDisplay').value = so ? so.hq : '';
+};
+
+document.getElementById('workedWithSelect').onchange = () => {
+  const val = document.getElementById('workedWithSelect').value;
+  const nameBox = document.getElementById('workedWithName');
+  if (val === 'alone') {
+    nameBox.style.display = 'none';
+    nameBox.value = '';
+  } else {
+    nameBox.style.display = 'block';
+  }
 };
 
 // start with one town row and one product row for convenience
@@ -331,6 +359,15 @@ document.getElementById('submitBtn').onclick = async () => {
   const date = document.getElementById('reportDate').value;
   if (!soCode) { errEl.textContent = 'Please select your name.'; errEl.style.display='block'; window.scrollTo(0,0); return; }
   if (!date) { errEl.textContent = 'Please select a date.'; errEl.style.display='block'; return; }
+
+  const workedWithType = document.getElementById('workedWithSelect').value;
+  const workedWithNameVal = document.getElementById('workedWithName').value.trim();
+  if (workedWithType !== 'alone' && !workedWithNameVal) {
+    errEl.textContent = 'Enter the name of the person you worked with today.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const workedWith = workedWithType === 'alone' ? 'Alone' : `${workedWithType.toUpperCase()} - ${workedWithNameVal}`;
 
   const towns = [];
   document.querySelectorAll('.town-block').forEach(block => {
@@ -366,6 +403,7 @@ document.getElementById('submitBtn').onclick = async () => {
     retailers_met: totalRetailers,
     pc: productiveCalls,
     towns_visited: towns.length,
+    worked_with: workedWith,
     route: towns.map(t => t.town).join(', '),
     towns: towns,
     products: products,
