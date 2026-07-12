@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>OTC Evening Report</title>
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIk9UQyBFdmVuaW5nIFJlcG9ydCIsICJzaG9ydF9uYW1lIjogIk9UQyBSZXBvcnQiLCAic3RhcnRfdXJsIjogIi4iLCAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIsICJ0aGVtZV9jb2xvciI6ICIjMUQ5RTc1In0=" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+  :root {
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --c-text: #1a1a1a;
+    --c-text-secondary: #6b7280;
+    --c-danger: #dc2626;
+    --c-bg: #f9fafb;
+    --c-card: #ffffff;
+    --c-border: #e5e7eb;
+    --c-accent: #1D9E75;
+    --c-accent-dark: #0F6E56;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: var(--font-sans); background: var(--c-bg); color: var(--c-text); font-size: 15px; -webkit-tap-highlight-color: transparent; }
+  .topbar { position: sticky; top:0; z-index:10; background: var(--c-card); border-bottom: 1px solid var(--c-border); padding: 14px 16px; display:flex; align-items:center; justify-content:space-between; }
+  .logo { font-weight:700; font-size:16px; }
+  .logo span { color: var(--c-accent); }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 16px 16px 100px; }
+  .step { background: var(--c-card); border:1px solid var(--c-border); border-radius: var(--radius); padding:16px; margin-bottom:14px; }
+  .step-label { font-size:12px; font-weight:600; color: var(--c-accent-dark); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; }
+  label.field-label { display:block; font-size:13px; font-weight:600; margin: 12px 0 6px; color: var(--c-text); }
+  select, input[type=text], input[type=number], input[type=date] {
+    width:100%; padding: 12px 14px; font-size:16px; font-family: var(--font-sans);
+    border:1px solid var(--c-border); border-radius:10px; background:#fff; color: var(--c-text);
+  }
+  select:focus, input:focus { outline:none; border-color: var(--c-accent); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
+  .town-block, .product-block { border:1px solid var(--c-border); border-radius:10px; padding:12px; margin-bottom:10px; background: var(--c-bg); position:relative; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .remove-btn { position:absolute; top:8px; right:8px; background:none; border:none; color:var(--c-danger); font-size:18px; cursor:pointer; padding:4px; line-height:1; }
+  .add-btn { width:100%; padding:12px; background:#fff; border:1.5px dashed var(--c-accent); color: var(--c-accent-dark); border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; margin-top:4px; }
+  .add-btn:active { background: #E1F5EE; }
+  .submit-bar { position:fixed; bottom:0; left:0; right:0; background: var(--c-card); border-top:1px solid var(--c-border); padding:12px 16px; z-index:20; }
+  .submit-btn { width:100%; max-width:520px; margin:0 auto; display:block; padding:15px; background: var(--c-accent); color:#fff; border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; }
+  .submit-btn:disabled { background:#9ca3af; }
+  .totals-row { display:flex; justify-content:space-between; font-size:13px; color: var(--c-text-secondary); padding: 8px 2px 0; }
+  .totals-row b { color: var(--c-text); }
+  #msgBox { text-align:center; padding: 60px 20px; }
+  #msgBox .ti-circle-check { font-size:56px; color: var(--c-accent); }
+  #msgBox .ti-alert-circle { font-size:56px; color: var(--c-danger); }
+  #msgBox h2 { margin: 16px 0 8px; }
+  #msgBox p { color: var(--c-text-secondary); margin-bottom: 20px; }
+  #msgBox button { padding:12px 24px; background: var(--c-accent); color:#fff; border:none; border-radius:10px; font-weight:600; font-size:14px; cursor:pointer; }
+  .hint { font-size:12px; color: var(--c-text-secondary); margin-top:4px; }
+  .error-text { font-size:13px; color: var(--c-danger); margin-top:8px; display:none; }
+  datalist {}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <span class="logo">OTC <span>Evening Report</span></span>
+</div>
+
+<div class="wrap" id="formWrap">
+
+  <div class="step">
+    <div class="step-label">1. Who are you?</div>
+    <label class="field-label">Your Name</label>
+    <select id="soSelect">
+      <option value="">-- Select your name --</option>
+      <option value="3544">Abhay Ladwal (Ludhiana)</option>
+      <option value="3522">Abhishek Sharma (Patiala)</option>
+      <option value="3496">Ajay (Jind)</option>
+      <option value="3542">Ankit (Ferozepur)</option>
+      <option value="3519">Arshdeep Singh Soni (Amritsar)</option>
+      <option value="3457">Ashish Singh (Delhi)</option>
+      <option value="3524">Bhura Ram (Barmer)</option>
+      <option value="3499">Deepak (Bhiwani)</option>
+      <option value="3494">Dhan Raj (Abohar)</option>
+      <option value="3461">Dilshad Ali (Agra)</option>
+      <option value="3556">Harpreet Singh (Moga)</option>
+      <option value="3489">Himanshu (Sirsa)</option>
+      <option value="3555">Hitesh Saxena (Bareilly)</option>
+      <option value="3488">Inder Dutt (Panipat)</option>
+      <option value="3493">Kamal Dauliya (Ajmer)</option>
+      <option value="3463">Kapil Daiya (Jodhpur)</option>
+      <option value="3541">Lipsun (Hoshiarpur)</option>
+      <option value="3476">Mohammed Asif (Sikar)</option>
+      <option value="3487">Prashant (Faridabad)</option>
+      <option value="3526">Prinkal Kumar (Bhatinda)</option>
+      <option value="3545">Rahul (Rewari)</option>
+      <option value="3546">Rahul Mishra (Delhi)</option>
+      <option value="3462">Rakesh Kumar (Alwar)</option>
+      <option value="3527">Sachin Kumar (Karnal)</option>
+      <option value="3483">Sarvjeet Singh (Yamunanagar)</option>
+      <option value="3480">Saurabh Kumar (Moradabad)</option>
+      <option value="3475">Saurabh Pachauri (Ghaziabad)</option>
+      <option value="3473">Shahbaj Khan (Meerut)</option>
+      <option value="3446">Shariq Imran (Saharanpur)</option>
+      <option value="3516">Shubham (Kangra)</option>
+      <option value="3553">Shubham Gupta (Jalandhar)</option>
+      <option value="3452">Sonu (Sriganganagar)</option>
+      <option value="None">Sagar (Faridabad)</option>
+      <option value="3454">Uday Singh (Kota)</option>
+      <option value="3447">Uzair (Haridwar)</option>
+      <option value="3525">Vikram Singh (Hissar)</option>
+      <option value="3543">Vinod Kumar (Jammu)</option>
+      <option value="3534">Yogesh Kumar (East Delhi -Loni-)</option>
+    </select>
+
+    <label class="field-label">Date</label>
+    <input type="date" id="reportDate">
+  </div>
+
+  <div class="step">
+    <div class="step-label">2. Towns Visited Today</div>
+    <div id="townList"></div>
+    <button type="button" class="add-btn" id="addTownBtn"><i class="ti ti-plus"></i> Add Town</button>
+  </div>
+
+  <div class="step">
+    <div class="step-label">3. Products Sold Today (Total for the day)</div>
+    <div id="productList"></div>
+    <button type="button" class="add-btn" id="addProductBtn"><i class="ti ti-plus"></i> Add Product</button>
+    <div class="totals-row">Product entries are for the whole day, not per town.</div>
+  </div>
+
+  <div class="step">
+    <div class="totals-row"><span>Total POB (all towns)</span><b id="totalPobDisplay">₹0</b></div>
+    <div class="totals-row"><span>Total Retailers Met</span><b id="totalRetailersDisplay">0</b></div>
+    <div class="error-text" id="formError"></div>
+  </div>
+
+</div>
+
+<div id="msgBox" style="display:none;"></div>
+
+<div class="submit-bar" id="submitBar">
+  <button class="submit-btn" id="submitBtn">Submit Report</button>
+</div>
+
+<script>
+const SO_ROSTER = [{"name": "SHARIQ IMRAN", "code": 3446, "hq": "SAHARANPUR", "state": "UTTAR PRADESH"}, {"name": "UZAIR", "code": 3447, "hq": "HARIDWAR", "state": "UTTRAKHAND"}, {"name": "SONU", "code": 3452, "hq": "SRIGANGANAGAR", "state": "RAJASTHAN"}, {"name": "ASHISH SINGH", "code": 3457, "hq": "DELHI", "state": "DELHI"}, {"name": "UDAY SINGH", "code": 3454, "hq": "KOTA", "state": "RAJASTHAN"}, {"name": "DILSHAD ALI", "code": 3461, "hq": "AGRA", "state": "UTTAR PRADESH"}, {"name": "KAPIL DAIYA", "code": 3463, "hq": "JODHPUR", "state": "RAJASTHAN"}, {"name": "RAKESH KUMAR", "code": 3462, "hq": "ALWAR", "state": "RAJASTHAN"}, {"name": "SHAHBAJ KHAN", "code": 3473, "hq": "MEERUT", "state": "UTTAR PRADESH"}, {"name": "MOHAMMED ASIF", "code": 3476, "hq": "SIKAR", "state": "RAJASTHAN"}, {"name": "SAURABH PACHAURI", "code": 3475, "hq": "Ghaziabad", "state": "UTTAR PRADESH"}, {"name": "SAURABH KUMAR", "code": 3480, "hq": "MORADABAD", "state": "UTTAR PRADESH"}, {"name": "INDER DUTT", "code": 3488, "hq": "PANIPAT", "state": "HARYANA"}, {"name": "PRASHANT", "code": 3487, "hq": "FARIDABAD", "state": "HARYANA"}, {"name": "SARVJEET SINGH", "code": 3483, "hq": "YAMUNANAGAR", "state": "HARYANA"}, {"name": "HIMANSHU", "code": 3489, "hq": "SIRSA", "state": "HARYANA"}, {"name": "KAMAL DAULIYA", "code": 3493, "hq": "AJMER", "state": "RAJASTHAN"}, {"name": "DHAN RAJ", "code": 3494, "hq": "Abohar", "state": "PUNJAB"}, {"name": "AJAY", "code": 3496, "hq": "JIND", "state": "HARYANA"}, {"name": "DEEPAK", "code": 3499, "hq": "BHIWANI", "state": "HARYANA"}, {"name": "ARSHDEEP SINGH SONI", "code": 3519, "hq": "AMRITSAR", "state": "PUNJAB"}, {"name": "SHUBHAM", "code": 3516, "hq": "KANGRA", "state": "HIMACHAL PRADESH"}, {"name": "ABHISHEK SHARMA", "code": 3522, "hq": "PATIALA", "state": "PUNJAB"}, {"name": "VIKRAM SINGH", "code": 3525, "hq": "HISSAR", "state": "HARYANA"}, {"name": "BHURA RAM", "code": 3524, "hq": "BARMER", "state": "RAJASTHAN"}, {"name": "PRINKAL KUMAR", "code": 3526, "hq": "BHATINDA", "state": "PUNJAB"}, {"name": "SACHIN KUMAR", "code": 3527, "hq": "KARNAL", "state": "HARYANA"}, {"name": "YOGESH KUMAR", "code": 3534, "hq": "EAST DELHI -LONI-", "state": "DELHI"}, {"name": "RAHUL", "code": 3545, "hq": "REWARI", "state": "HARYANA"}, {"name": "ABHAY LADWAL", "code": 3544, "hq": "LUDHIANA", "state": "PUNJAB"}, {"name": "LIPSUN", "code": 3541, "hq": "HOSHIARPUR", "state": "PUNJAB"}, {"name": "VINOD KUMAR", "code": 3543, "hq": "JAMMU", "state": "JAMMU & KASMIR"}, {"name": "ANKIT", "code": 3542, "hq": "FEROZEPUR", "state": "PUNJAB"}, {"name": "RAHUL MISHRA", "code": 3546, "hq": "DELHI", "state": "DELHI"}, {"name": "SHUBHAM GUPTA", "code": 3553, "hq": "JALANDHAR", "state": "PUNJAB"}, {"name": "HARPREET SINGH", "code": 3556, "hq": "MOGA", "state": "PUNJAB"}, {"name": "HITESH SAXENA", "code": 3555, "hq": "BAREILLY", "state": "UTTAR PRADESH"}, {"name": "Sagar", "code": null, "hq": "FARIDABAD", "state": "HARYANA"}];
+const PRODUCTS = ["A-4 CREAM 1X15G", "ACNE DERMA SOAP 1X75gm", "ACNEDERMA FOAM FACE WASH GEL 1X150ml", "ACNEDERMA GENTLE FACE WASH GEL 1x60GM", "ALERGIPIL-180 TAB (10X1X10)", "ALERGIPIL-M 120 TAB (10X1X10)", "ANTI TICK POWDER 1X100GM", "CALPIL PET FEED SUPP. SYRUP 1X200ml", "CREMAPIL PLUS SUSPENSION 200 ML", "DA' MANPIL (30*1*4 TABS)", "DANCURE SHAMPOO 1X50ml", "DERMACARE NEEM AND ALOEVERA SOAP 1X100G", "DERMACARE NEEM PLUS FACE WASH GEL(1X50G)", "DERMACARE NIP CARE CREAM (1X30GM)", "DERMOPIL PET SHAMPOO 1X200ml", "Dr. Pil  Pregnancy Test Kit (25x1 KIT)", "Dr. Pil SOTHREX TULSI LOZENGES 150X1 Tab", "HEAD LICE SHAMPOO 1X30ml", "HEAD LICE SHAMPOO 1X50ml", "HEAD LICE SOAP 1X75gm", "LACTOPIL  SOLUTION 1X100ML", "LACTOPIL SOLUTION 1X200ml", "MANPIL SUPER-20 (30X1X4 TABS)", "MANPIL-100 (30X1X4 TABS)", "MANPIL-50 (30X1X4 TABS)", "MOUTH ULSOR TABS (20X10)", "MULTIZAC FORTE SYRUP 1X200ML", "MYCONORM POWDER 1X75gm", "NAPY SOFT CREAM  ( 1X50 GM)", "NASOPIL ADULT NASAL DROPS 1X10ml", "NASOPIL PAEDIATRIC NASAL DROPS 1X10ML", "NEEM & MINT PRICKLY HEAT SOAP 1X100G", "NEEM PLUS HERBAL DENTAL GEL ( 1X50 GM )", "NEEM PLUS HERBAL DENTAL GEL 100G KIT PACK", "NEEM PLUS HERBAL DENTAL GEL 1X100G", "NEUROVITE CAPSULE 15X1X10", "ORTHODEX GEL 1X15G", "ORTHODEX GEL 1X30G", "ORTHODEX GEL 1X50G", "ORTHODEX ROLL ON 1X50GM", "ORTHODEX SPRAY 1X60GM", "ORTHODEX-DS GEL 1X30G", "PETGROW FEED SUPP. SYRUP 1X200ML", "PIL TEARS EYE DROPS 20X10ML (KIT)", "PIL UV SOFT CREAM 1X50GM", "PIL UV SOFT LOTION 1X50ML", "PIL'S D3 ORAL SOLUTION 4X5ML", "PIL'S HEEL & FOOT CREAM 1X30gm", "POVIPIL GARGLE SOLUTION 1X100ML", "POVIPIL OINTMENT 1X20G", "POVIPIL SOLUTION 1X100ML", "POWERMAN-100(30X1X4 TABS)", "PRICKLY HEAT SOAP 1X75G", "SCABEPIL SOAP 1*75G", "SCARNIL CREAM 1X50GM", "SEBO PLUS SOAP 1X75G", "SENSOPIL  GEL  ( 1X50 GM)", "SENSOPIL GEL 1X125GM", "SMART PET FEED SUPP. SYRUP 1X200ML", "SNEECURE EXTRA (30X10 TABS)", "SOTHREX BR SYRUP 1X100ML", "SOTHREX TULSI SYRUP 1X100ml", "SOTHREX TULSI SYRUP 1X60ML (CARTON PACK)", "SOTHREX-PLUS SYRUP 1X100ml", "TEMPCON-650(10X5X10 TABS)", "TEMPCON-EXTRA (10X2X10 TABS)", "TEMPCON-EXTRA (2X10 TABS)", "TICK & FLEA SHAMPOO 1X1000ml", "TICK & FLEA SHAMPOO 1X200ml", "TICK & FLEA SHAMPOO 1X500ml", "TICK & FLEA SOAP 1X100gm", "TOPVITE-FORTE (10X15 TABS)", "TOPVITE-PLUS (10X1X10 CAPS)", "TROMAMOL PLUS(22X5X10 TABS) CEL.PACK", "ULSOR MOUTH GEL 1X10G"];
+const SO_TOWNS = {"AJAY": ["JIND", "TOHANA"], "BHURA RAM": ["BARMER", "JAISALMER"], "VIKRAM SINGH": ["HANSI", "HISSAR"], "DILSHAD ALI": ["AGRA", "ETAH", "FIROZABAD", "MATHURA"], "SAURABH KUMAR": ["AMROHA", "CHANDAUSI SAMBHAL", "Moradabad", "SAMBHAL"], "VACANT": ["CHANDIGARH", "GURUGRAM", "JHAJJAR", "ROHTAK"], "INDER DUTT": ["PANIPAT", "SONIPAT"], "PRINKAL KUMAR": ["BHATINDA"], "SHHAHBAJ KHAN": ["BULANDSHAHR", "MEERUT"], "UZAIR": ["DEHRADUN", "HARIDWAR", "ROORKEE"], "ASHISH SINGH": ["DELHI", "NEW DELHI", "SOUTH DELHI"], "MOHAMMED ASIF": ["SIKAR"], "DHAN RAJ": ["FARIDKOT", "FAZILKA"], "SHUBHAM": ["KANGRA", "MANDI"], "SAURABH PACHAURI": ["GHAZIABAD"], "SARVJEET SINGH": ["YAMUNA NAGAR", "YAMUNANAGAR"], "ANKIT": ["FEROZEPUR", "FEROZPUR"], "SHARIQ IMRAN": ["MUZAFFAR NAGAR", "SAHARANPUR"], "HITESH SAXENA": ["BAREILLY"], "LIPSUN": ["HOSHIARPUR"], "PRASHANT": ["FARIDABAD", "PALWAL"], "UDAY SINGH": ["JHALAWAR", "KOTA", "SAWAI MADHOPUR"], "SONU": ["Hanumangarh", "SRI GANGANAGAR"], "KAMAL DAULIYA": ["AJMER", "KEKRI (AJMER)"], "RAKESH KUMAR": ["ALWAR"], "HARPREET SINGH": ["MOGA"], "VINOD KUMAR": ["JAMMU"], "KAPIL DAIYA": ["JODHPUR"], "HIMANSHU": ["FATEHABAD", "SIRSA"], "RAHUL": ["REWARI"], "ABHISHEK SHARMA": ["PATIALA"], "SHUBHAM GUPTA": ["JALANDHAR"], "RAHUL PRAJAPATI": ["JAIPUR"], "ARSHDEEP SINGH SONI": ["AMRITSAR"], "DEEPAK": ["BHIWANI"], "ABHAY LADWAL": ["LUDHIANA"], "SACHIN KUMAR": ["KARNAL"]};
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCyGVJtBL4mk0bdTUxN9_SaiM4gwZhdb6k",
+  authDomain: "otc-evening-reports.firebaseapp.com",
+  databaseURL: "https://otc-evening-reports-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "otc-evening-reports",
+  storageBucket: "otc-evening-reports.firebasestorage.app",
+  messagingSenderId: "287698321424",
+  appId: "1:287698321424:web:a9a618c8fc8386eca5ca95"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ---------- helpers ----------
+function todayISO() {
+  const d = new Date();
+  const tz = new Date(d.getTime() - d.getTimezoneOffset()*60000);
+  return tz.toISOString().slice(0,10);
+}
+document.getElementById('reportDate').value = todayISO();
+document.getElementById('reportDate').max = todayISO();
+
+const soByCode = {};
+SO_ROSTER.forEach(s => soByCode[s.code] = s);
+
+let townRowCount = 0;
+let productRowCount = 0;
+
+function currentTownOptionsHTML(soCode) {
+  const so = soByCode[soCode];
+  const key = so ? Object.keys(SO_TOWNS).find(k => k === so.name.toUpperCase()) : null;
+  const list = key ? SO_TOWNS[key] : [];
+  return list.map(t => `<option value="${t}">${t}</option>`).join('');
+}
+
+function addTownRow() {
+  townRowCount++;
+  const id = townRowCount;
+  const soCode = document.getElementById('soSelect').value;
+  const div = document.createElement('div');
+  div.className = 'town-block';
+  div.id = `town-${id}`;
+  div.innerHTML = `
+    <button type="button" class="remove-btn" onclick="removeBlock('town-${id}')"><i class="ti ti-x"></i></button>
+    <label class="field-label" style="margin-top:0;">Town</label>
+    <input type="text" list="townOptions-${id}" class="townNameInput" placeholder="Select or type town name">
+    <datalist id="townOptions-${id}">${currentTownOptionsHTML(soCode)}</datalist>
+    <div class="row2">
+      <div>
+        <label class="field-label">POB (₹)</label>
+        <input type="number" class="townPobInput" min="0" placeholder="0" oninput="recalcTotals()">
+      </div>
+      <div>
+        <label class="field-label">Retailers Met</label>
+        <input type="number" class="townRetailersInput" min="0" placeholder="0" oninput="recalcTotals()">
+      </div>
+    </div>
+  `;
+  document.getElementById('townList').appendChild(div);
+}
+
+function addProductRow() {
+  productRowCount++;
+  const id = productRowCount;
+  const div = document.createElement('div');
+  div.className = 'product-block';
+  div.id = `product-${id}`;
+  div.innerHTML = `
+    <button type="button" class="remove-btn" onclick="removeBlock('product-${id}')"><i class="ti ti-x"></i></button>
+    <label class="field-label" style="margin-top:0;">Product</label>
+    <input type="text" list="productOptions" class="productNameInput" placeholder="Select or type product name">
+    <label class="field-label">Quantity Sold</label>
+    <input type="number" class="productQtyInput" min="0" placeholder="0">
+  `;
+  document.getElementById('productList').appendChild(div);
+}
+
+function removeBlock(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+  recalcTotals();
+}
+
+function recalcTotals() {
+  let pob = 0, ret = 0;
+  document.querySelectorAll('.townPobInput').forEach(i => pob += Number(i.value) || 0);
+  document.querySelectorAll('.townRetailersInput').forEach(i => ret += Number(i.value) || 0);
+  document.getElementById('totalPobDisplay').textContent = '₹' + pob.toLocaleString();
+  document.getElementById('totalRetailersDisplay').textContent = ret;
+}
+
+// shared product datalist (created once)
+const productDatalist = document.createElement('datalist');
+productDatalist.id = 'productOptions';
+productDatalist.innerHTML = PRODUCTS.map(p => `<option value="${p}"></option>`).join('');
+document.body.appendChild(productDatalist);
+
+document.getElementById('addTownBtn').onclick = addTownRow;
+document.getElementById('addProductBtn').onclick = addProductRow;
+document.getElementById('soSelect').onchange = () => {
+  // refresh town suggestions on existing rows to match newly selected SO
+  document.querySelectorAll('.town-block').forEach(block => {
+    const dl = block.querySelector('datalist');
+    dl.innerHTML = currentTownOptionsHTML(document.getElementById('soSelect').value);
+  });
+};
+
+// start with one town row and one product row for convenience
+addTownRow();
+
+// ---------- submit ----------
+document.getElementById('submitBtn').onclick = async () => {
+  const errEl = document.getElementById('formError');
+  errEl.style.display = 'none';
+
+  const soCode = document.getElementById('soSelect').value;
+  const date = document.getElementById('reportDate').value;
+  if (!soCode) { errEl.textContent = 'Please select your name.'; errEl.style.display='block'; window.scrollTo(0,0); return; }
+  if (!date) { errEl.textContent = 'Please select a date.'; errEl.style.display='block'; return; }
+
+  const towns = [];
+  document.querySelectorAll('.town-block').forEach(block => {
+    const name = block.querySelector('.townNameInput').value.trim();
+    const pob = Number(block.querySelector('.townPobInput').value) || 0;
+    const retailers = Number(block.querySelector('.townRetailersInput').value) || 0;
+    if (name) towns.push({ town: name, pob, retailers_met: retailers });
+  });
+  if (!towns.length) { errEl.textContent = 'Add at least one town visited today.'; errEl.style.display='block'; return; }
+
+  const products = [];
+  document.querySelectorAll('.product-block').forEach(block => {
+    const name = block.querySelector('.productNameInput').value.trim();
+    const qty = Number(block.querySelector('.productQtyInput').value) || 0;
+    if (name && qty > 0) products.push({ product: name, qty });
+  });
+
+  const so = soByCode[soCode];
+  const totalPob = towns.reduce((s,t) => s + t.pob, 0);
+  const totalRetailers = towns.reduce((s,t) => s + t.retailers_met, 0);
+
+  const record = {
+    so_name: so.name,
+    hq: so.hq,
+    state: so.state,
+    pob_done: totalPob,
+    retailers_met: totalRetailers,
+    pc: towns.length,
+    route: towns.map(t => t.town).join(', '),
+    towns: towns,
+    products: products,
+    matched: true,
+    is_clean: true,
+    source: 'form',
+    submitted_at: Date.now()
+  };
+
+  document.getElementById('submitBtn').disabled = true;
+  document.getElementById('submitBtn').textContent = 'Submitting...';
+
+  try {
+    await db.ref(`/reports/${date}/${soCode}`).set(record);
+    showMessage(true, so.name, date, totalPob, towns.length, products.length);
+  } catch (e) {
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('submitBtn').textContent = 'Submit Report';
+    errEl.textContent = 'Could not submit — check your internet connection and try again. (' + e.message + ')';
+    errEl.style.display = 'block';
+  }
+};
+
+function showMessage(success, soName, date, pob, townCount, productCount) {
+  document.getElementById('formWrap').style.display = 'none';
+  document.getElementById('submitBar').style.display = 'none';
+  const box = document.getElementById('msgBox');
+  box.style.display = 'block';
+  box.innerHTML = `
+    <i class="ti ti-circle-check"></i>
+    <h2>Report Submitted</h2>
+    <p>${soName.replace(/\b\w/g, c => c.toUpperCase())} — ${date}<br>
+    ₹${pob.toLocaleString()} POB across ${townCount} town(s), ${productCount} product(s) logged.</p>
+    <button onclick="location.reload()">Submit Another / Edit Today's Report</button>
+  `;
+}
+</script>
+</body>
+</html>
