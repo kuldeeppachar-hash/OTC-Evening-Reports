@@ -1,0 +1,9 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": "auth != null && (auth.uid == 'Ec9qpqZ1T4N4sTpLHazOtrYfZU62' || auth.uid == 'c7pSUMy7B0PftLRaBau4jCF6wa02' || auth.uid == 'uEYR2uOR58f4EOw0DqJFbpRY9ui2')",
+    "reports": {
+      ".write": true
+    }
+  }
+}
