@@ -62,6 +62,7 @@
 
 <div class="topbar">
   <span class="logo">OTC <span>Evening Report</span></span>
+  <button id="installBtn" style="display:none; background:var(--c-accent); color:#fff; border:none; padding:8px 14px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;"><i class="ti ti-download"></i> Install App</button>
 </div>
 
 <div class="wrap" id="formWrap">
@@ -126,10 +127,16 @@
     <div id="productList"></div>
     <button type="button" class="add-btn" id="addProductBtn"><i class="ti ti-plus"></i> Add Product</button>
     <div class="totals-row">Product entries are for the whole day, not per town.</div>
+    <div class="totals-row"><span><b>Total POB for the day (qty × PTD)</b></span><b id="productPobTotal">₹0</b></div>
   </div>
 
   <div class="step">
-    <div class="totals-row"><span>Total POB (all towns)</span><b id="totalPobDisplay">₹0</b></div>
+    <div class="step-label">4. Productive Calls (PC)</div>
+    <label class="field-label" style="margin-top:0;">Out of all chemists met today, how many gave an order?</label>
+    <input type="number" id="pcInput" min="0" placeholder="e.g. 5">
+  </div>
+
+  <div class="step">
     <div class="totals-row"><span>Total Retailers Met</span><b id="totalRetailersDisplay">0</b></div>
     <div class="error-text" id="formError"></div>
   </div>
@@ -145,6 +152,10 @@
 <script>
 const SO_ROSTER = [{"name": "SHARIQ IMRAN", "code": 3446, "hq": "SAHARANPUR", "state": "UTTAR PRADESH"}, {"name": "UZAIR", "code": 3447, "hq": "HARIDWAR", "state": "UTTRAKHAND"}, {"name": "SONU", "code": 3452, "hq": "SRIGANGANAGAR", "state": "RAJASTHAN"}, {"name": "ASHISH SINGH", "code": 3457, "hq": "DELHI", "state": "DELHI"}, {"name": "UDAY SINGH", "code": 3454, "hq": "KOTA", "state": "RAJASTHAN"}, {"name": "DILSHAD ALI", "code": 3461, "hq": "AGRA", "state": "UTTAR PRADESH"}, {"name": "KAPIL DAIYA", "code": 3463, "hq": "JODHPUR", "state": "RAJASTHAN"}, {"name": "RAKESH KUMAR", "code": 3462, "hq": "ALWAR", "state": "RAJASTHAN"}, {"name": "SHAHBAJ KHAN", "code": 3473, "hq": "MEERUT", "state": "UTTAR PRADESH"}, {"name": "MOHAMMED ASIF", "code": 3476, "hq": "SIKAR", "state": "RAJASTHAN"}, {"name": "SAURABH PACHAURI", "code": 3475, "hq": "Ghaziabad", "state": "UTTAR PRADESH"}, {"name": "SAURABH KUMAR", "code": 3480, "hq": "MORADABAD", "state": "UTTAR PRADESH"}, {"name": "INDER DUTT", "code": 3488, "hq": "PANIPAT", "state": "HARYANA"}, {"name": "PRASHANT", "code": 3487, "hq": "FARIDABAD", "state": "HARYANA"}, {"name": "SARVJEET SINGH", "code": 3483, "hq": "YAMUNANAGAR", "state": "HARYANA"}, {"name": "HIMANSHU", "code": 3489, "hq": "SIRSA", "state": "HARYANA"}, {"name": "KAMAL DAULIYA", "code": 3493, "hq": "AJMER", "state": "RAJASTHAN"}, {"name": "DHAN RAJ", "code": 3494, "hq": "Abohar", "state": "PUNJAB"}, {"name": "AJAY", "code": 3496, "hq": "JIND", "state": "HARYANA"}, {"name": "DEEPAK", "code": 3499, "hq": "BHIWANI", "state": "HARYANA"}, {"name": "ARSHDEEP SINGH SONI", "code": 3519, "hq": "AMRITSAR", "state": "PUNJAB"}, {"name": "SHUBHAM", "code": 3516, "hq": "KANGRA", "state": "HIMACHAL PRADESH"}, {"name": "ABHISHEK SHARMA", "code": 3522, "hq": "PATIALA", "state": "PUNJAB"}, {"name": "VIKRAM SINGH", "code": 3525, "hq": "HISSAR", "state": "HARYANA"}, {"name": "BHURA RAM", "code": 3524, "hq": "BARMER", "state": "RAJASTHAN"}, {"name": "PRINKAL KUMAR", "code": 3526, "hq": "BHATINDA", "state": "PUNJAB"}, {"name": "SACHIN KUMAR", "code": 3527, "hq": "KARNAL", "state": "HARYANA"}, {"name": "YOGESH KUMAR", "code": 3534, "hq": "EAST DELHI -LONI-", "state": "DELHI"}, {"name": "RAHUL", "code": 3545, "hq": "REWARI", "state": "HARYANA"}, {"name": "ABHAY LADWAL", "code": 3544, "hq": "LUDHIANA", "state": "PUNJAB"}, {"name": "LIPSUN", "code": 3541, "hq": "HOSHIARPUR", "state": "PUNJAB"}, {"name": "VINOD KUMAR", "code": 3543, "hq": "JAMMU", "state": "JAMMU & KASMIR"}, {"name": "ANKIT", "code": 3542, "hq": "FEROZEPUR", "state": "PUNJAB"}, {"name": "RAHUL MISHRA", "code": 3546, "hq": "DELHI", "state": "DELHI"}, {"name": "SHUBHAM GUPTA", "code": 3553, "hq": "JALANDHAR", "state": "PUNJAB"}, {"name": "HARPREET SINGH", "code": 3556, "hq": "MOGA", "state": "PUNJAB"}, {"name": "HITESH SAXENA", "code": 3555, "hq": "BAREILLY", "state": "UTTAR PRADESH"}, {"name": "Sagar", "code": null, "hq": "FARIDABAD", "state": "HARYANA"}];
 const PRODUCTS = ["A-4 CREAM 1X15G", "ACNE DERMA SOAP 1X75gm", "ACNEDERMA FOAM FACE WASH GEL 1X150ml", "ACNEDERMA GENTLE FACE WASH GEL 1x60GM", "ALERGIPIL-180 TAB (10X1X10)", "ALERGIPIL-M 120 TAB (10X1X10)", "ANTI TICK POWDER 1X100GM", "CALPIL PET FEED SUPP. SYRUP 1X200ml", "CREMAPIL PLUS SUSPENSION 200 ML", "DA' MANPIL (30*1*4 TABS)", "DANCURE SHAMPOO 1X50ml", "DERMACARE NEEM AND ALOEVERA SOAP 1X100G", "DERMACARE NEEM PLUS FACE WASH GEL(1X50G)", "DERMACARE NIP CARE CREAM (1X30GM)", "DERMOPIL PET SHAMPOO 1X200ml", "Dr. Pil  Pregnancy Test Kit (25x1 KIT)", "Dr. Pil SOTHREX TULSI LOZENGES 150X1 Tab", "HEAD LICE SHAMPOO 1X30ml", "HEAD LICE SHAMPOO 1X50ml", "HEAD LICE SOAP 1X75gm", "LACTOPIL  SOLUTION 1X100ML", "LACTOPIL SOLUTION 1X200ml", "MANPIL SUPER-20 (30X1X4 TABS)", "MANPIL-100 (30X1X4 TABS)", "MANPIL-50 (30X1X4 TABS)", "MOUTH ULSOR TABS (20X10)", "MULTIZAC FORTE SYRUP 1X200ML", "MYCONORM POWDER 1X75gm", "NAPY SOFT CREAM  ( 1X50 GM)", "NASOPIL ADULT NASAL DROPS 1X10ml", "NASOPIL PAEDIATRIC NASAL DROPS 1X10ML", "NEEM & MINT PRICKLY HEAT SOAP 1X100G", "NEEM PLUS HERBAL DENTAL GEL ( 1X50 GM )", "NEEM PLUS HERBAL DENTAL GEL 100G KIT PACK", "NEEM PLUS HERBAL DENTAL GEL 1X100G", "NEUROVITE CAPSULE 15X1X10", "ORTHODEX GEL 1X15G", "ORTHODEX GEL 1X30G", "ORTHODEX GEL 1X50G", "ORTHODEX ROLL ON 1X50GM", "ORTHODEX SPRAY 1X60GM", "ORTHODEX-DS GEL 1X30G", "PETGROW FEED SUPP. SYRUP 1X200ML", "PIL TEARS EYE DROPS 20X10ML (KIT)", "PIL UV SOFT CREAM 1X50GM", "PIL UV SOFT LOTION 1X50ML", "PIL'S D3 ORAL SOLUTION 4X5ML", "PIL'S HEEL & FOOT CREAM 1X30gm", "POVIPIL GARGLE SOLUTION 1X100ML", "POVIPIL OINTMENT 1X20G", "POVIPIL SOLUTION 1X100ML", "POWERMAN-100(30X1X4 TABS)", "PRICKLY HEAT SOAP 1X75G", "SCABEPIL SOAP 1*75G", "SCARNIL CREAM 1X50GM", "SEBO PLUS SOAP 1X75G", "SENSOPIL  GEL  ( 1X50 GM)", "SENSOPIL GEL 1X125GM", "SMART PET FEED SUPP. SYRUP 1X200ML", "SNEECURE EXTRA (30X10 TABS)", "SOTHREX BR SYRUP 1X100ML", "SOTHREX TULSI SYRUP 1X100ml", "SOTHREX TULSI SYRUP 1X60ML (CARTON PACK)", "SOTHREX-PLUS SYRUP 1X100ml", "TEMPCON-650(10X5X10 TABS)", "TEMPCON-EXTRA (10X2X10 TABS)", "TEMPCON-EXTRA (2X10 TABS)", "TICK & FLEA SHAMPOO 1X1000ml", "TICK & FLEA SHAMPOO 1X200ml", "TICK & FLEA SHAMPOO 1X500ml", "TICK & FLEA SOAP 1X100gm", "TOPVITE-FORTE (10X15 TABS)", "TOPVITE-PLUS (10X1X10 CAPS)", "TROMAMOL PLUS(22X5X10 TABS) CEL.PACK", "ULSOR MOUTH GEL 1X10G"];
+// Price-to-distributor per product, from New_Master_Data_Sheet.xlsx (Revised PTD where set, else base PTD).
+// null = no price on file; auto-calc falls back to manual entry for that product.
+const PRODUCT_PTD = {"A-4 CREAM 1X15G": 16, "ACNE DERMA SOAP 1X75gm": 27, "ACNEDERMA FOAM FACE WASH GEL 1X150ml": 86, "ACNEDERMA GENTLE FACE WASH GEL 1x60GM": 45, "ALERGIPIL-180 TAB (10X1X10)": 275, "ALERGIPIL-M 120 TAB (10X1X10)": 225, "ANTI TICK POWDER 1X100GM": 70, "CALPIL PET FEED SUPP. SYRUP 1X200ml": 44, "CREMAPIL PLUS SUSPENSION 200 ML": 42.15, "DA' MANPIL (30*1*4 TABS)": 600, "DANCURE SHAMPOO 1X50ml": 38, "DERMACARE NEEM AND ALOEVERA SOAP 1X100G": 33, "DERMACARE NEEM PLUS FACE WASH GEL(1X50G)": 40, "DERMACARE NIP CARE CREAM (1X30GM)": 49.5, "DERMOPIL PET SHAMPOO 1X200ml": 90, "Dr. Pil  Pregnancy Test Kit (25x1 KIT)": 135, "Dr. Pil SOTHREX TULSI LOZENGES 150X1 Tab": 100, "HEAD LICE SHAMPOO 1X30ml": 36, "HEAD LICE SHAMPOO 1X50ml": 42, "HEAD LICE SOAP 1X75gm": 35, "LACTOPIL  SOLUTION 1X100ML": 66, "LACTOPIL SOLUTION 1X200ml": 132, "MANPIL SUPER-20 (30X1X4 TABS)": 170, "MANPIL-100 (30X1X4 TABS)": 180, "MANPIL-50 (30X1X4 TABS)": 125, "MOUTH ULSOR TABS (20X10)": 160, "MULTIZAC FORTE SYRUP 1X200ML": 38.5, "MYCONORM POWDER 1X75gm": 30, "NAPY SOFT CREAM  ( 1X50 GM)": 37, "NASOPIL ADULT NASAL DROPS 1X10ml": 16, "NASOPIL PAEDIATRIC NASAL DROPS 1X10ML": 15.5, "NEEM & MINT PRICKLY HEAT SOAP 1X100G": 37, "NEEM PLUS HERBAL DENTAL GEL ( 1X50 GM )": 26, "NEEM PLUS HERBAL DENTAL GEL 1X100G": 50, "NEUROVITE CAPSULE 15X1X10": 175, "ORTHODEX GEL 1X15G": 16.75, "ORTHODEX GEL 1X30G": 22.75, "ORTHODEX GEL 1X50G": 35.75, "ORTHODEX ROLL ON 1X50GM": 50, "ORTHODEX SPRAY 1X60GM": 57, "ORTHODEX-DS GEL 1X30G": 25.5, "PETGROW FEED SUPP. SYRUP 1X200ML": 71.5, "PIL TEARS EYE DROPS 20X10ML (KIT)": 265, "PIL UV SOFT CREAM 1X50GM": 75, "PIL UV SOFT LOTION 1X50ML": 165, "PIL'S D3 ORAL SOLUTION 4X5ML": 55, "PIL'S HEEL & FOOT CREAM 1X30gm": 36, "POVIPIL GARGLE SOLUTION 1X100ML": 27, "POVIPIL OINTMENT 1X20G": 15, "POVIPIL SOLUTION 1X100ML": 22.5, "POWERMAN-100(30X1X4 TABS)": 180, "PRICKLY HEAT SOAP 1X75G": 35, "SCABEPIL SOAP 1*75G": 26, "SCARNIL CREAM 1X50GM": 140, "SEBO PLUS SOAP 1X75G": 38, "SENSOPIL  GEL  ( 1X50 GM)": 30, "SENSOPIL GEL 1X125GM": 55, "SMART PET FEED SUPP. SYRUP 1X200ML": 60.5, "SNEECURE EXTRA (30X10 TABS)": 330, "SOTHREX BR SYRUP 1X100ML": 27, "SOTHREX TULSI SYRUP 1X100ml": 28, "SOTHREX TULSI SYRUP 1X60ML (CARTON PACK)": 19, "SOTHREX-PLUS SYRUP 1X100ml": 28, "TEMPCON-650(10X5X10 TABS)": 400, "TEMPCON-EXTRA (10X2X10 TABS)": 185, "TICK & FLEA SHAMPOO 1X1000ml": 280, "TICK & FLEA SHAMPOO 1X200ml": 95, "TICK & FLEA SHAMPOO 1X500ml": 174, "TICK & FLEA SOAP 1X100gm": 42, "TOPVITE-FORTE (10X15 TABS)": 425, "TOPVITE-PLUS (10X1X10 CAPS)": 250, "TROMAMOL PLUS(22X5X10 TABS) CEL.PACK": 660, "ULSOR MOUTH GEL 1X10G": 17, "TEMPCON-EXTRA (2X10 TABS)": null, "NEEM PLUS HERBAL DENTAL GEL 100G KIT PACK": null};
+
 const SO_TOWNS = {"AJAY": ["JIND", "TOHANA"], "BHURA RAM": ["BARMER", "JAISALMER"], "VIKRAM SINGH": ["HANSI", "HISSAR"], "DILSHAD ALI": ["AGRA", "ETAH", "FIROZABAD", "MATHURA"], "SAURABH KUMAR": ["AMROHA", "CHANDAUSI SAMBHAL", "Moradabad", "SAMBHAL"], "VACANT": ["CHANDIGARH", "GURUGRAM", "JHAJJAR", "ROHTAK"], "INDER DUTT": ["PANIPAT", "SONIPAT"], "PRINKAL KUMAR": ["BHATINDA"], "SHHAHBAJ KHAN": ["BULANDSHAHR", "MEERUT"], "UZAIR": ["DEHRADUN", "HARIDWAR", "ROORKEE"], "ASHISH SINGH": ["DELHI", "NEW DELHI", "SOUTH DELHI"], "MOHAMMED ASIF": ["SIKAR"], "DHAN RAJ": ["FARIDKOT", "FAZILKA"], "SHUBHAM": ["KANGRA", "MANDI"], "SAURABH PACHAURI": ["GHAZIABAD"], "SARVJEET SINGH": ["YAMUNA NAGAR", "YAMUNANAGAR"], "ANKIT": ["FEROZEPUR", "FEROZPUR"], "SHARIQ IMRAN": ["MUZAFFAR NAGAR", "SAHARANPUR"], "HITESH SAXENA": ["BAREILLY"], "LIPSUN": ["HOSHIARPUR"], "PRASHANT": ["FARIDABAD", "PALWAL"], "UDAY SINGH": ["JHALAWAR", "KOTA", "SAWAI MADHOPUR"], "SONU": ["Hanumangarh", "SRI GANGANAGAR"], "KAMAL DAULIYA": ["AJMER", "KEKRI (AJMER)"], "RAKESH KUMAR": ["ALWAR"], "HARPREET SINGH": ["MOGA"], "VINOD KUMAR": ["JAMMU"], "KAPIL DAIYA": ["JODHPUR"], "HIMANSHU": ["FATEHABAD", "SIRSA"], "RAHUL": ["REWARI"], "ABHISHEK SHARMA": ["PATIALA"], "SHUBHAM GUPTA": ["JALANDHAR"], "RAHUL PRAJAPATI": ["JAIPUR"], "ARSHDEEP SINGH SONI": ["AMRITSAR"], "DEEPAK": ["BHIWANI"], "ABHAY LADWAL": ["LUDHIANA"], "SACHIN KUMAR": ["KARNAL"]};
 
 const firebaseConfig = {
@@ -159,7 +170,34 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ---------- helpers ----------
+// ---------- PWA INSTALL ----------
+let deferredInstallPrompt = null;
+const installBtn = document.getElementById('installBtn');
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+
+if (!isStandalone) {
+  if (isIOS) {
+    installBtn.style.display = 'inline-flex';
+    installBtn.onclick = () => alert('To install: tap the Share icon in Safari, then "Add to Home Screen".');
+  } else {
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      installBtn.style.display = 'inline-flex';
+    });
+    installBtn.onclick = async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      await deferredInstallPrompt.userChoice;
+      deferredInstallPrompt = null;
+      installBtn.style.display = 'none';
+    };
+    window.addEventListener('appinstalled', () => { installBtn.style.display = 'none'; });
+  }
+}
+
+
 function todayISO() {
   const d = new Date();
   const tz = new Date(d.getTime() - d.getTimezoneOffset()*60000);
@@ -193,16 +231,8 @@ function addTownRow() {
     <label class="field-label" style="margin-top:0;">Town</label>
     <input type="text" list="townOptions-${id}" class="townNameInput" placeholder="Select or type town name">
     <datalist id="townOptions-${id}">${currentTownOptionsHTML(soCode)}</datalist>
-    <div class="row2">
-      <div>
-        <label class="field-label">POB (₹)</label>
-        <input type="number" class="townPobInput" min="0" placeholder="0" oninput="recalcTotals()">
-      </div>
-      <div>
-        <label class="field-label">Retailers Met</label>
-        <input type="number" class="townRetailersInput" min="0" placeholder="0" oninput="recalcTotals()">
-      </div>
-    </div>
+    <label class="field-label">Retailers Met</label>
+    <input type="number" class="townRetailersInput" min="0" placeholder="0" oninput="recalcTotals()">
   `;
   document.getElementById('townList').appendChild(div);
 }
@@ -216,24 +246,54 @@ function addProductRow() {
   div.innerHTML = `
     <button type="button" class="remove-btn" onclick="removeBlock('product-${id}')"><i class="ti ti-x"></i></button>
     <label class="field-label" style="margin-top:0;">Product</label>
-    <input type="text" list="productOptions" class="productNameInput" placeholder="Select or type product name">
+    <input type="text" list="productOptions" class="productNameInput" placeholder="Select or type product name" oninput="recalcProductRow(${id})">
     <label class="field-label">Quantity Sold</label>
-    <input type="number" class="productQtyInput" min="0" placeholder="0">
+    <input type="number" class="productQtyInput" min="0" placeholder="0" oninput="recalcProductRow(${id})">
+    <div class="hint" id="productAmt-${id}"></div>
   `;
   document.getElementById('productList').appendChild(div);
+}
+
+function recalcProductRow(id) {
+  const block = document.getElementById(`product-${id}`);
+  const name = block.querySelector('.productNameInput').value.trim();
+  const qty = Number(block.querySelector('.productQtyInput').value) || 0;
+  const amtEl = document.getElementById(`productAmt-${id}`);
+  const ptd = PRODUCT_PTD.hasOwnProperty(name) ? PRODUCT_PTD[name] : undefined;
+  if (name && ptd == null) {
+    amtEl.textContent = ptd === undefined ? '' : 'PTD not on file — amount not auto-calculated for this product.';
+    amtEl.style.color = 'var(--c-danger)';
+  } else if (name && qty > 0) {
+    amtEl.textContent = `PTD ₹${ptd} × ${qty} = ₹${(ptd*qty).toLocaleString()}`;
+    amtEl.style.color = 'var(--c-text-secondary)';
+  } else {
+    amtEl.textContent = '';
+  }
+  recalcProductTotal();
+}
+
+function recalcProductTotal() {
+  let total = 0;
+  document.querySelectorAll('.product-block').forEach(block => {
+    const name = block.querySelector('.productNameInput').value.trim();
+    const qty = Number(block.querySelector('.productQtyInput').value) || 0;
+    const ptd = PRODUCT_PTD[name];
+    if (name && ptd != null && qty > 0) total += ptd * qty;
+  });
+  const el = document.getElementById('productPobTotal');
+  if (el) el.textContent = '₹' + total.toLocaleString();
 }
 
 function removeBlock(id) {
   const el = document.getElementById(id);
   if (el) el.remove();
   recalcTotals();
+  recalcProductTotal();
 }
 
 function recalcTotals() {
-  let pob = 0, ret = 0;
-  document.querySelectorAll('.townPobInput').forEach(i => pob += Number(i.value) || 0);
+  let ret = 0;
   document.querySelectorAll('.townRetailersInput').forEach(i => ret += Number(i.value) || 0);
-  document.getElementById('totalPobDisplay').textContent = '₹' + pob.toLocaleString();
   document.getElementById('totalRetailersDisplay').textContent = ret;
 }
 
@@ -269,9 +329,8 @@ document.getElementById('submitBtn').onclick = async () => {
   const towns = [];
   document.querySelectorAll('.town-block').forEach(block => {
     const name = block.querySelector('.townNameInput').value.trim();
-    const pob = Number(block.querySelector('.townPobInput').value) || 0;
     const retailers = Number(block.querySelector('.townRetailersInput').value) || 0;
-    if (name) towns.push({ town: name, pob, retailers_met: retailers });
+    if (name) towns.push({ town: name, retailers_met: retailers });
   });
   if (!towns.length) { errEl.textContent = 'Add at least one town visited today.'; errEl.style.display='block'; return; }
 
@@ -279,20 +338,28 @@ document.getElementById('submitBtn').onclick = async () => {
   document.querySelectorAll('.product-block').forEach(block => {
     const name = block.querySelector('.productNameInput').value.trim();
     const qty = Number(block.querySelector('.productQtyInput').value) || 0;
-    if (name && qty > 0) products.push({ product: name, qty });
+    const ptd = PRODUCT_PTD[name];
+    const amount = (qty > 0 && ptd != null) ? ptd * qty : 0;
+    if (name && qty > 0) products.push({ product: name, qty, ptd: ptd != null ? ptd : null, amount });
   });
+  const productPobTotal = products.reduce((s,p) => s + (p.amount||0), 0);
+  if (!products.length) { errEl.textContent = 'Add at least one product sold today — this is now how POB is calculated.'; errEl.style.display='block'; return; }
 
   const so = soByCode[soCode];
-  const totalPob = towns.reduce((s,t) => s + t.pob, 0);
   const totalRetailers = towns.reduce((s,t) => s + t.retailers_met, 0);
+
+  const pcVal = document.getElementById('pcInput').value;
+  const productiveCalls = pcVal === '' ? null : Number(pcVal);
+  if (productiveCalls === null || productiveCalls < 0) { errEl.textContent = 'Enter productive calls (PC) — how many chemists gave an order today.'; errEl.style.display='block'; return; }
 
   const record = {
     so_name: so.name,
     hq: so.hq,
     state: so.state,
-    pob_done: totalPob,
+    pob_done: productPobTotal,
     retailers_met: totalRetailers,
-    pc: towns.length,
+    pc: productiveCalls,
+    towns_visited: towns.length,
     route: towns.map(t => t.town).join(', '),
     towns: towns,
     products: products,
@@ -302,12 +369,25 @@ document.getElementById('submitBtn').onclick = async () => {
     submitted_at: Date.now()
   };
 
+  // ---- guard against silently overwriting an existing report for this SO+date ----
+  try {
+    const existingSnap = await db.ref(`/reports/${date}/${soCode}`).get();
+    if (existingSnap.exists()) {
+      const existing = existingSnap.val();
+      const existingTime = existing.submitted_at ? new Date(existing.submitted_at).toLocaleTimeString() : 'earlier';
+      const ok = confirm(`You already submitted a report for ${date} at ${existingTime}.\n\nSubmitting again will REPLACE that report. Continue?`);
+      if (!ok) return;
+    }
+  } catch (e) {
+    // if the existence check itself fails, fall through and let the normal submit try/catch handle it
+  }
+
   document.getElementById('submitBtn').disabled = true;
   document.getElementById('submitBtn').textContent = 'Submitting...';
 
   try {
     await db.ref(`/reports/${date}/${soCode}`).set(record);
-    showMessage(true, so.name, date, totalPob, towns.length, products.length);
+    showMessage(true, so.name, date, productPobTotal, towns.length, products.length);
   } catch (e) {
     document.getElementById('submitBtn').disabled = false;
     document.getElementById('submitBtn').textContent = 'Submit Report';

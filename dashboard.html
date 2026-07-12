@@ -118,7 +118,7 @@
   <div class="card">
     <div class="table-scroll">
       <table id="mainTable">
-        <thead><tr><th>SO Name</th><th>HQ</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Route</th></tr></thead>
+        <thead><tr><th>SO Name</th><th>HQ</th><th>Status</th><th>POB Done</th><th>Retailers Met</th><th>PC</th><th>Towns Visited</th><th>Route</th></tr></thead>
         <tbody id="mainTbody"></tbody>
       </table>
     </div>
@@ -187,11 +187,11 @@ function renderDate(date) {
     const hq = (roster[name] && roster[name].hq) || '-';
     if (st === 'reported') {
       const rec = Object.values(dayReports).find(r => r.so_name === name);
-      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-reported">Reported</span></td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.route||'-'}</td></tr>`;
+      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-reported">Reported</span></td><td>${rec.pob_done||'-'}</td><td>${rec.retailers_met||'-'}</td><td>${rec.pc||'-'}</td><td>${rec.towns_visited||'-'}</td><td>${rec.route||'-'}</td></tr>`;
     } else if (st === 'not_yet_joined') {
-      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-vacant">Not yet joined</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-vacant">Not yet joined</span></td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     } else {
-      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-missing">Missing</span></td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
+      rows += `<tr><td>${name}</td><td>${hq}</td><td><span class="status-pill s-missing">Missing</span></td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td></tr>`;
     }
   }
   tbody.innerHTML = rows;
@@ -253,6 +253,7 @@ document.getElementById('exportBtn').onclick = () => {
         'POB Done': rec && rec.pob_done ? Number(rec.pob_done) : '',
         'Retailers Met': rec && rec.retailers_met ? Number(rec.retailers_met) : '',
         'PC': rec && rec.pc ? Number(rec.pc) : '',
+        'Towns Visited': rec && rec.towns_visited ? Number(rec.towns_visited) : '',
         'Route': rec && rec.route ? rec.route : '',
       });
     }
@@ -260,7 +261,7 @@ document.getElementById('exportBtn').onclick = () => {
 
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{wch:12},{wch:24},{wch:16},{wch:10},{wch:12},{wch:14},{wch:8},{wch:24}];
+  ws['!cols'] = [{wch:12},{wch:24},{wch:16},{wch:10},{wch:12},{wch:14},{wch:8},{wch:14},{wch:24}];
   XLSX.utils.book_append_sheet(wb, ws, 'Evening Reports');
   XLSX.writeFile(wb, `OTC_Evening_Reports_${fromVal}_to_${toVal}.xlsx`);
   statusEl.textContent = `Exported ${rows.length} rows.`;
