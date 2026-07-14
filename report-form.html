@@ -4,8 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>OTC Evening Report</title>
-<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIk9UQyBFdmVuaW5nIFJlcG9ydCIsICJzaG9ydF9uYW1lIjogIk9UQyBSZXBvcnQiLCAic3RhcnRfdXJsIjogIi4iLCAiZGlzcGxheSI6ICJzdGFuZGFsb25lIiwgImJhY2tncm91bmRfY29sb3IiOiAiI2ZmZmZmZiIsICJ0aGVtZV9jb2xvciI6ICIjMUQ5RTc1IiwgImljb25zIjogW3sic3JjIjogImljb24tMTkyLnBuZyIsICJzaXplcyI6ICIxOTJ4MTkyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIn0sIHsic3JjIjogImljb24tNTEyLnBuZyIsICJzaXplcyI6ICI1MTJ4NTEyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIn1dfQ==" />
-<link rel="icon" href="icon-192.png" />
+<link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIk9UQyBFdmVuaW5nIFJlcG9ydCIsICJzaG9ydF9uYW1lIjogIk9UQyBSZXBvcnQiLCAic3RhcnRfdXJsIjogImh0dHBzOi8va3VsZGVlcHBhY2hhci1oYXNoLmdpdGh1Yi5pby9PVEMtRXZlbmluZy1SZXBvcnRzL3JlcG9ydC1mb3JtLmh0bWwiLCAic2NvcGUiOiAiaHR0cHM6Ly9rdWxkZWVwcGFjaGFyLWhhc2guZ2l0aHViLmlvL09UQy1FdmVuaW5nLVJlcG9ydHMvIiwgImRpc3BsYXkiOiAic3RhbmRhbG9uZSIsICJiYWNrZ3JvdW5kX2NvbG9yIjogIiNmZmZmZmYiLCAidGhlbWVfY29sb3IiOiAiIzFEOUU3NSIsICJpY29ucyI6IFt7InNyYyI6ICJodHRwczovL2t1bGRlZXBwYWNoYXItaGFzaC5naXRodWIuaW8vT1RDLUV2ZW5pbmctUmVwb3J0cy9pY29uLTE5Mi5wbmciLCAic2l6ZXMiOiAiMTkyeDE5MiIsICJ0eXBlIjogImltYWdlL3BuZyJ9LCB7InNyYyI6ICJodHRwczovL2t1bGRlZXBwYWNoYXItaGFzaC5naXRodWIuaW8vT1RDLUV2ZW5pbmctUmVwb3J0cy9pY29uLTUxMi5wbmciLCAic2l6ZXMiOiAiNTEyeDUxMiIsICJ0eXBlIjogImltYWdlL3BuZyJ9XX0=" />
+<link rel="icon" href="https://kuldeeppachar-hash.github.io/OTC-Evening-Reports/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css" />
@@ -78,6 +78,21 @@
 
     <label class="field-label">Date</label>
     <input type="date" id="reportDate">
+
+    <label class="field-label">Headquarter (HQ)</label>
+    <input type="text" id="hqDisplay" readonly placeholder="Auto-fills once you select your name" style="background:var(--c-bg); color:var(--c-text-secondary);">
+  </div>
+
+  <div class="step">
+    <div class="step-label">Worked With</div>
+    <select id="workedWithSelect">
+      <option value="alone">Alone</option>
+      <option value="asm">ASM</option>
+      <option value="rsm">RSM</option>
+      <option value="zsm">ZSM</option>
+      <option value="others">Others</option>
+    </select>
+    <input type="text" id="workedWithName" placeholder="Enter name" style="display:none; margin-top:10px;">
   </div>
 
   <div class="step">
@@ -337,6 +352,19 @@ document.getElementById('soSelect').onchange = () => {
     const dl = block.querySelector('datalist');
     dl.innerHTML = currentTownOptionsHTML(document.getElementById('soSelect').value);
   });
+  const so = soByCode[document.getElementById('soSelect').value];
+  document.getElementById('hqDisplay').value = so ? so.hq : '';
+};
+
+document.getElementById('workedWithSelect').onchange = () => {
+  const val = document.getElementById('workedWithSelect').value;
+  const nameBox = document.getElementById('workedWithName');
+  if (val === 'alone') {
+    nameBox.style.display = 'none';
+    nameBox.value = '';
+  } else {
+    nameBox.style.display = 'block';
+  }
 };
 
 // start with one town row and one product row for convenience
@@ -351,6 +379,15 @@ document.getElementById('submitBtn').onclick = async () => {
   const date = document.getElementById('reportDate').value;
   if (!soCode) { errEl.textContent = 'Please select your name.'; errEl.style.display='block'; window.scrollTo(0,0); return; }
   if (!date) { errEl.textContent = 'Please select a date.'; errEl.style.display='block'; return; }
+
+  const workedWithType = document.getElementById('workedWithSelect').value;
+  const workedWithNameVal = document.getElementById('workedWithName').value.trim();
+  if (workedWithType !== 'alone' && !workedWithNameVal) {
+    errEl.textContent = 'Enter the name of the person you worked with today.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const workedWith = workedWithType === 'alone' ? 'Alone' : `${workedWithType.toUpperCase()} - ${workedWithNameVal}`;
 
   const towns = [];
   document.querySelectorAll('.town-block').forEach(block => {
@@ -386,6 +423,7 @@ document.getElementById('submitBtn').onclick = async () => {
     retailers_met: totalRetailers,
     pc: productiveCalls,
     towns_visited: towns.length,
+    worked_with: workedWith,
     route: towns.map(t => t.town).join(', '),
     towns: towns,
     products: products,
