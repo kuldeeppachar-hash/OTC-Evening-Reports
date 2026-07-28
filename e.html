@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Emergency Info</title>
+<style>
+  :root{
+    --red:#d32f2f; --red-dark:#a02222; --green:#1b8a4a; --green-dark:#146638;
+    --ink:#1a1a1a; --muted:#6b6b6b; --bg:#f4f5f7; --card:#ffffff; --border:#e3e5e9;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
+    background:var(--bg); color:var(--ink); min-height:100vh;
+    display:flex; justify-content:center; padding:0 0 40px;
+  }
+  .wrap{width:100%; max-width:460px;}
+  .banner{
+    background:var(--red); color:#fff; text-align:center; padding:14px 16px;
+    font-weight:700; font-size:15px; letter-spacing:.3px;
+  }
+  .card{
+    background:var(--card); margin:16px; border-radius:16px; overflow:hidden;
+    box-shadow:0 2px 10px rgba(0,0,0,.06); border:1px solid var(--border);
+  }
+  .profile{ display:flex; gap:14px; align-items:center; padding:18px; }
+  .profile img{
+    width:76px; height:76px; border-radius:50%; object-fit:cover; background:#ddd;
+    border:2px solid var(--border); flex-shrink:0;
+  }
+  .profile .name{font-size:19px; font-weight:700; margin:0 0 2px;}
+  .profile .role{font-size:13px; color:var(--muted); margin:0 0 2px;}
+  .profile .code{font-size:12px; color:var(--muted);}
+  .blood{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    background:#fdecec; color:var(--red); font-weight:700; font-size:20px;
+    padding:14px; margin:0 16px 16px; border-radius:12px;
+  }
+  .blood .drop{font-size:22px;}
+  .section-title{
+    font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted);
+    margin:0 16px 8px; font-weight:700;
+  }
+  .contact{
+    display:flex; align-items:center; justify-content:space-between;
+    background:var(--card); border:1px solid var(--border); border-radius:12px;
+    padding:12px 14px; margin:0 16px 10px;
+  }
+  .contact .info .n{font-weight:600; font-size:15px;}
+  .contact .info .r{font-size:12px; color:var(--muted);}
+  .callbtn{
+    display:flex; align-items:center; gap:6px; background:var(--green); color:#fff;
+    border:none; border-radius:24px; padding:9px 16px; font-weight:700; font-size:13px;
+    text-decoration:none; white-space:nowrap;
+  }
+  .callbtn:active{background:var(--green-dark);}
+  .sos-row{display:flex; gap:10px; margin:20px 16px 6px;}
+  .sos-btn{
+    flex:1; text-align:center; padding:14px 8px; border-radius:14px; text-decoration:none;
+    font-weight:800; font-size:14px; color:#fff; letter-spacing:.3px;
+  }
+  .sos-btn.amb{background:var(--red);}
+  .sos-btn.pol{background:#1e4fa0;}
+  .sos-btn .num{display:block; font-size:20px; margin-top:2px;}
+  footer{text-align:center; font-size:11px; color:var(--muted); margin-top:22px; padding:0 20px;}
+  .loading, .error{text-align:center; padding:60px 20px; color:var(--muted);}
+  .error{color:var(--red); font-weight:600;}
+  .hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="banner">⚠ MEDICAL EMERGENCY CONTACT CARD</div>
+
+  <div id="loading" class="loading">Loading emergency info…</div>
+  <div id="error" class="error hidden">This QR code is not linked to an active record. Please contact PIL OTC head office.</div>
+
+  <div id="content" class="hidden">
+    <div class="card">
+      <div class="profile">
+        <img id="photo" src="" alt="Photo">
+        <div>
+          <p class="name" id="name">—</p>
+          <p class="role" id="role">—</p>
+          <p class="code" id="code">—</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="blood"><span class="drop">🩸</span><span>Blood Group: <span id="bg">—</span></span></div>
+
+    <p class="section-title">Emergency Contacts</p>
+    <div id="contacts"></div>
+
+    <p class="section-title">Reporting Manager</p>
+    <div id="manager"></div>
+
+    <div class="sos-row">
+      <a class="sos-btn amb" href="tel:108">Ambulance<span class="num">108</span></a>
+      <a class="sos-btn pol" href="tel:100">Police<span class="num">100</span></a>
+    </div>
+
+    <footer>Psychotropics India Limited — OTC Division · Emergency ID System<br>Only essential safety information is shown here.</footer>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+// ===== FIREBASE CONFIG — reusing the live OTC Evening Reports project =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCyGVJtBL4mk0bdTUxN9_SaiM4gwZhdb6k",
+  authDomain: "otc-evening-reports.firebaseapp.com",
+  databaseURL: "https://otc-evening-reports-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "otc-evening-reports",
+  storageBucket: "otc-evening-reports.firebasestorage.app",
+  messagingSenderId: "287698321424",
+  appId: "1:287698321424:web:a9a618c8fc8386eca5ca95"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function getId(){
+  const params = new URLSearchParams(window.location.search);
+  return (params.get('id') || '').trim().toUpperCase();
+}
+
+function contactRow(name, relation, phone){
+  const div = document.createElement('div');
+  div.className = 'contact';
+  div.innerHTML = `
+    <div class="info">
+      <div class="n">${esc(name) || 'Contact'}</div>
+      <div class="r">${esc(relation) || ''}</div>
+    </div>
+    <a class="callbtn" href="tel:${esc(phone)}">📞 Call</a>`;
+  return div;
+}
+
+async function load(){
+  const id = getId();
+  if(!id){ showError(); return; }
+  try{
+    const snap = await db.ref('public_emergency/' + id).once('value');
+    const emp = snap.val();
+    if(!emp || emp.status !== 'Active'){ showError(); return; }
+
+    document.getElementById('name').textContent = emp.fullName || '—';
+    document.getElementById('role').textContent = [emp.designation, emp.headquarter].filter(Boolean).join(' · ') || '—';
+    document.getElementById('code').textContent = 'ID: ' + id;
+    document.getElementById('bg').textContent = emp.bloodGroup || '—';
+    document.getElementById('photo').src = emp.photoUrl || 'https://placehold.co/150x150?text=Photo';
+
+    const contactsEl = document.getElementById('contacts');
+    contactsEl.innerHTML = '';
+    if(emp.contact1Phone) contactsEl.appendChild(contactRow(emp.contact1Name, emp.contact1Relation, emp.contact1Phone));
+    if(emp.contact2Phone) contactsEl.appendChild(contactRow(emp.contact2Name, emp.contact2Relation, emp.contact2Phone));
+    if(!emp.contact1Phone && !emp.contact2Phone){
+      contactsEl.innerHTML = '<p style="margin:0 16px;color:var(--muted);font-size:13px;">No emergency contact on file.</p>';
+    }
+
+    const mgrEl = document.getElementById('manager');
+    mgrEl.innerHTML = '';
+    if(emp.managerPhone){
+      mgrEl.appendChild(contactRow(emp.managerName, 'Reporting Manager', emp.managerPhone));
+    } else {
+      mgrEl.innerHTML = '<p style="margin:0 16px;color:var(--muted);font-size:13px;">Not available.</p>';
+    }
+
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('content').classList.remove('hidden');
+  }catch(e){
+    console.error(e);
+    showError();
+  }
+}
+function showError(){
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('error').classList.remove('hidden');
+}
+load();
+</script>
+</body>
+</html>

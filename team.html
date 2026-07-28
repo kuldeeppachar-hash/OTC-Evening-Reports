@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PIL Emergency ID — Admin</title>
+<style>
+  :root{
+    --ink:#1a1a1a; --muted:#666; --bg:#f4f5f7; --card:#fff; --border:#e1e3e8;
+    --blue:#1e56c4; --blue-dark:#163f92; --red:#d32f2f; --green:#1b8a4a; --amber:#b9791b;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink);}
+  header{background:var(--blue);color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center;}
+  header h1{font-size:17px;margin:0;font-weight:700;}
+  header button{background:rgba(255,255,255,.15);color:#fff;border:none;padding:8px 14px;border-radius:8px;cursor:pointer;font-size:13px;}
+  main{max-width:1100px;margin:0 auto;padding:20px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:18px;margin-bottom:20px;}
+  .card h2{font-size:15px;margin:0 0 12px;}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  input[type=text],input[type=file],input[type=date],select,textarea{
+    padding:9px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;width:100%;
+  }
+  label{font-size:12px;color:var(--muted);font-weight:600;display:block;margin-bottom:4px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media(max-width:700px){.grid2,.grid3{grid-template-columns:1fr;}}
+  button.primary{background:var(--blue);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;}
+  button.primary:hover{background:var(--blue-dark);}
+  button.ghost{background:#fff;border:1px solid var(--border);padding:9px 14px;border-radius:8px;cursor:pointer;font-size:13px;}
+  button.danger{background:#fdecec;color:var(--red);border:1px solid #f3c6c6;padding:7px 12px;border-radius:8px;cursor:pointer;font-size:12px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;padding:8px;color:var(--muted);border-bottom:1px solid var(--border);font-size:11px;text-transform:uppercase;}
+  td{padding:9px 8px;border-bottom:1px solid #f0f0f2;vertical-align:middle;}
+  .badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge.active{background:#e6f5eb;color:var(--green);}
+  .badge.inactive{background:#f0f0f2;color:var(--muted);}
+  .thumb{width:32px;height:32px;border-radius:50%;object-fit:cover;background:#ddd;vertical-align:middle;margin-right:8px;}
+  .actions button{margin-right:6px;}
+  #loginScreen{max-width:360px;margin:80px auto;}
+  .status-msg{font-size:13px;padding:10px 12px;border-radius:8px;margin-top:10px;}
+  .status-msg.ok{background:#e6f5eb;color:var(--green);}
+  .status-msg.err{background:#fdecec;color:var(--red);}
+  .status-msg.info{background:#eaf1fd;color:var(--blue);}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .modal{background:#fff;border-radius:14px;padding:22px;max-width:560px;width:100%;max-height:90vh;overflow:auto;}
+  .modal h2{margin-top:0;}
+  .hidden{display:none;}
+  .qr-print-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px;}
+  .qr-card{border:1px dashed #bbb;border-radius:10px;padding:12px;text-align:center;}
+  .qr-card img.qr{width:110px;height:110px;}
+  .qr-card .n{font-weight:700;font-size:12px;margin-top:6px;}
+  .qr-card .c{font-size:10px;color:var(--muted);}
+  @media print{ header,.card:not(.printable){display:none;} body{background:#fff;} }
+  .toolbar-right{margin-left:auto;}
+  small.hint{color:var(--muted);display:block;margin-top:6px;font-size:12px;}
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="card">
+    <h2>Admin Login</h2>
+    <label>Email</label>
+    <input type="text" id="loginEmail" placeholder="you@company.com">
+    <div style="height:10px;"></div>
+    <label>Password</label>
+    <input type="text" id="loginPass" placeholder="Password" style="-webkit-text-security:disc;">
+    <div style="height:14px;"></div>
+    <button class="primary" onclick="doLogin()" style="width:100%;">Log In</button>
+    <div id="loginMsg" class="status-msg err hidden"></div>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>PIL Emergency ID — Admin Dashboard</h1>
+    <button onclick="doLogout()">Log Out</button>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Bulk Upload from Master Excel / Google Form Sheet</h2>
+      <p style="font-size:13px;color:var(--muted);margin-top:-6px;">
+        Upload the exported .xlsx/.csv. Matches these columns exactly:
+        Employee Code, Full Name, Designation, Headquarter, Blood Group,
+        Emergency Contact Name 1/2, Emergency Contact Relation 1/2, Emergency Contact number 1/2,
+        Reporting Manager, Reporting Manager Number.
+        Existing records with the same Employee Code are updated (upsert) — new codes are added. Status, Medical Conditions, and Insurance are not touched by upload; edit those manually per employee.
+      </p>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv">
+      <div class="row" style="margin-top:10px;">
+        <button class="primary" onclick="processUpload()">Upload & Sync</button>
+      </div>
+      <div id="uploadMsg" class="status-msg hidden"></div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <h2 style="margin:0;">Employees</h2>
+        <div class="toolbar-right row">
+          <input type="text" id="searchBox" placeholder="Search name / code..." style="width:220px;" oninput="renderTable()">
+          <button class="ghost" onclick="openEditModal(null)">+ Add Employee</button>
+          <button class="ghost" onclick="printSelected()">Print QR Cards</button>
+        </div>
+      </div>
+      <div style="overflow-x:auto;margin-top:14px;">
+        <table id="empTable">
+          <thead>
+            <tr><th></th><th>Employee</th><th>Code</th><th>HQ</th><th>Blood</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="empTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card printable hidden" id="printArea">
+      <h2>Printable QR Cards</h2>
+      <div class="qr-print-grid" id="printGrid"></div>
+    </div>
+  </main>
+</div>
+
+<div id="editModalBg" class="modal-bg hidden">
+  <div class="modal">
+    <h2 id="modalTitle">Edit Employee</h2>
+    <div class="grid2">
+      <div><label>Employee Code</label><input type="text" id="f_code"></div>
+      <div><label>Status</label>
+        <select id="f_status"><option value="Pending">Pending (not yet public)</option><option value="Active">Active</option><option value="Inactive">Inactive</option></select>
+      </div>
+      <div><label>Full Name</label><input type="text" id="f_fullName"></div>
+      <div><label>Designation</label><input type="text" id="f_designation"></div>
+      <div><label>Headquarter</label><input type="text" id="f_headquarter"></div>
+      <div><label>Blood Group</label><input type="text" id="f_bloodGroup" placeholder="B+"></div>
+      <div><label>Contact 1 Name</label><input type="text" id="f_c1name"></div>
+      <div><label>Contact 1 Relation</label><input type="text" id="f_c1rel"></div>
+      <div><label>Contact 1 Phone</label><input type="text" id="f_c1phone"></div>
+      <div><label>Contact 2 Name</label><input type="text" id="f_c2name"></div>
+      <div><label>Contact 2 Relation</label><input type="text" id="f_c2rel"></div>
+      <div><label>Contact 2 Phone</label><input type="text" id="f_c2phone"></div>
+      <div><label>Reporting Manager</label><input type="text" id="f_mgrname"></div>
+      <div><label>Manager Phone</label><input type="text" id="f_mgrphone"></div>
+      <div><label>Photo URL</label><input type="text" id="f_photo" placeholder="https://..."></div>
+      <div><label>Insurance Company</label><input type="text" id="f_insco"></div>
+      <div><label>Insurance Policy No.</label><input type="text" id="f_inspolicy"></div>
+      <div><label>Insurance Validity</label><input type="date" id="f_insvalid"></div>
+    </div>
+    <div style="margin-top:12px;">
+      <label>Medical Conditions (admin-only, never shown publicly)</label>
+      <textarea id="f_medical" rows="2"></textarea>
+    </div>
+    <small class="hint">Photo URL: upload the photo to Firebase Storage or any image host and paste the link here. Bulk upload does not set photos automatically.</small>
+    <div class="row" style="margin-top:16px;">
+      <button class="primary" onclick="saveEmployee()">Save</button>
+      <button class="ghost" onclick="closeModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+// ===== FIREBASE CONFIG — reusing the live OTC Evening Reports project =====
+const firebaseConfig = {
+  apiKey: "AIzaSyCyGVJtBL4mk0bdTUxN9_SaiM4gwZhdb6k",
+  authDomain: "otc-evening-reports.firebaseapp.com",
+  databaseURL: "https://otc-evening-reports-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "otc-evening-reports",
+  storageBucket: "otc-evening-reports.firebasestorage.app",
+  messagingSenderId: "287698321424",
+  appId: "1:287698321424:web:a9a618c8fc8386eca5ca95"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+
+// e.html is hosted at:
+const PUBLIC_BASE_URL = "https://kuldeeppachar-hash.github.io/OTC-Dashboard/e.html";
+
+// Fields mirrored to the public_emergency node — anyone who scans a QR can read exactly these.
+// Never add medicalConditions, insuranceCompany, insurancePolicy, or insuranceValidity to this list.
+const PUBLIC_FIELDS = [
+  'fullName','designation','headquarter','bloodGroup','photoUrl','status',
+  'contact1Name','contact1Relation','contact1Phone',
+  'contact2Name','contact2Relation','contact2Phone',
+  'managerName','managerPhone'
+];
+function publicSubset(fullRecord){
+  const out = {};
+  PUBLIC_FIELDS.forEach(k => { out[k] = fullRecord[k] ?? null; });
+  return out;
+}
+
+let employees = {};
+let editingCode = null;
+
+// ---------- AUTH ----------
+function doLogin(){
+  const email = document.getElementById('loginEmail').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  auth.signInWithEmailAndPassword(email, pass).catch(err=>{
+    const m = document.getElementById('loginMsg');
+    m.textContent = err.message;
+    m.classList.remove('hidden');
+  });
+}
+function doLogout(){ auth.signOut(); }
+auth.onAuthStateChanged(user=>{
+  if(user){
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    listenEmployees();
+  } else {
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('app').classList.add('hidden');
+  }
+});
+
+// ---------- DATA ----------
+function listenEmployees(){
+  db.ref('employees').on('value', snap=>{
+    employees = snap.val() || {};
+    renderTable();
+  });
+}
+
+function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function renderTable(){
+  const q = (document.getElementById('searchBox').value || '').toLowerCase();
+  const tbody = document.getElementById('empTbody');
+  tbody.innerHTML = '';
+  const codes = Object.keys(employees).sort();
+  codes.forEach(code=>{
+    const e = employees[code];
+    const hay = (code + ' ' + (e.fullName||'')).toLowerCase();
+    if(q && !hay.includes(q)) return;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input type="checkbox" class="rowChk" data-code="${esc(code)}"></td>
+      <td><img class="thumb" src="${esc(e.photoUrl)||'https://placehold.co/60'}">${esc(e.fullName)||'—'}</td>
+      <td>${esc(code)}</td>
+      <td>${esc(e.headquarter)||'—'}</td>
+      <td>${esc(e.bloodGroup)||'—'}</td>
+      <td><span class="badge ${e.status==='Active'?'active':'inactive'}">${e.status||'Pending'}</span></td>
+      <td class="actions">
+        <button class="ghost" onclick="openEditModal('${esc(code)}')">Edit</button>
+        <button class="danger" onclick="toggleStatus('${esc(code)}')">${e.status==='Active'?'Disable':'Activate'}</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function toggleStatus(code){
+  const cur = employees[code] || {};
+  const next = cur.status === 'Active' ? 'Inactive' : 'Active';
+  const updates = {};
+  updates['employees/'+code+'/status'] = next;
+  updates['public_emergency/'+code+'/status'] = next;
+  db.ref().update(updates);
+}
+
+// ---------- MANUAL ADD/EDIT ----------
+function openEditModal(code){
+  editingCode = code;
+  document.getElementById('modalTitle').textContent = code ? 'Edit Employee' : 'Add Employee';
+  const e = code ? (employees[code]||{}) : {};
+  document.getElementById('f_code').value = code || '';
+  document.getElementById('f_code').disabled = !!code;
+  document.getElementById('f_status').value = e.status || (code ? 'Active' : 'Pending');
+  document.getElementById('f_fullName').value = e.fullName || '';
+  document.getElementById('f_designation').value = e.designation || '';
+  document.getElementById('f_headquarter').value = e.headquarter || '';
+  document.getElementById('f_bloodGroup').value = e.bloodGroup || '';
+  document.getElementById('f_c1name').value = e.contact1Name || '';
+  document.getElementById('f_c1rel').value = e.contact1Relation || '';
+  document.getElementById('f_c1phone').value = e.contact1Phone || '';
+  document.getElementById('f_c2name').value = e.contact2Name || '';
+  document.getElementById('f_c2rel').value = e.contact2Relation || '';
+  document.getElementById('f_c2phone').value = e.contact2Phone || '';
+  document.getElementById('f_mgrname').value = e.managerName || '';
+  document.getElementById('f_mgrphone').value = e.managerPhone || '';
+  document.getElementById('f_photo').value = e.photoUrl || '';
+  document.getElementById('f_insco').value = e.insuranceCompany || '';
+  document.getElementById('f_inspolicy').value = e.insurancePolicy || '';
+  document.getElementById('f_insvalid').value = e.insuranceValidity || '';
+  document.getElementById('f_medical').value = e.medicalConditions || '';
+  document.getElementById('editModalBg').classList.remove('hidden');
+}
+function closeModal(){ document.getElementById('editModalBg').classList.add('hidden'); }
+
+function saveEmployee(){
+  const code = document.getElementById('f_code').value.trim().toUpperCase();
+  if(!code){ alert('Employee Code is required.'); return; }
+  const data = {
+    fullName: document.getElementById('f_fullName').value.trim(),
+    designation: document.getElementById('f_designation').value.trim(),
+    headquarter: document.getElementById('f_headquarter').value.trim(),
+    bloodGroup: document.getElementById('f_bloodGroup').value.trim(),
+    contact1Name: document.getElementById('f_c1name').value.trim(),
+    contact1Relation: document.getElementById('f_c1rel').value.trim(),
+    contact1Phone: document.getElementById('f_c1phone').value.trim(),
+    contact2Name: document.getElementById('f_c2name').value.trim(),
+    contact2Relation: document.getElementById('f_c2rel').value.trim(),
+    contact2Phone: document.getElementById('f_c2phone').value.trim(),
+    managerName: document.getElementById('f_mgrname').value.trim(),
+    managerPhone: document.getElementById('f_mgrphone').value.trim(),
+    photoUrl: document.getElementById('f_photo').value.trim(),
+    insuranceCompany: document.getElementById('f_insco').value.trim(),
+    insurancePolicy: document.getElementById('f_inspolicy').value.trim(),
+    insuranceValidity: document.getElementById('f_insvalid').value,
+    medicalConditions: document.getElementById('f_medical').value.trim(),
+    status: document.getElementById('f_status').value
+  };
+  const updates = {};
+  updates['employees/'+code] = data;
+  updates['public_emergency/'+code] = publicSubset(data);
+  db.ref().update(updates).then(()=>{
+    closeModal();
+  }).catch(err=>alert('Save failed: '+err.message));
+}
+
+// ---------- BULK EXCEL UPLOAD ----------
+function processUpload(){
+  const fileInput = document.getElementById('fileInput');
+  const msg = document.getElementById('uploadMsg');
+  if(!fileInput.files.length){
+    msg.textContent = 'Choose a file first.'; msg.className='status-msg err'; return;
+  }
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const wb = XLSX.read(evt.target.result, {type:'binary'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+      if(!rows.length){ msg.textContent='No rows found.'; msg.className='status-msg err'; return; }
+
+      const updates = {};
+      let count = 0;
+      rows.forEach(r=>{
+        const code = (r['Employee Code']||'').toString().trim().toUpperCase();
+        if(!code) return;
+        updates[code] = {
+          fullName: (r['Full Name']||'').toString().trim(),
+          designation: (r['Designation']||'').toString().trim(),
+          headquarter: (r['Headquarter']||'').toString().trim(),
+          bloodGroup: (r['Blood Group']||'').toString().trim(),
+          contact1Name: (r['Emergency Contact Name 1']||'').toString().trim(),
+          contact1Relation: (r['Emergency Contact Relation 1']||'').toString().trim(),
+          contact1Phone: (r['Emergency Contact number 1']||'').toString().trim(),
+          contact2Name: (r['Emergency Contact Name 2']||'').toString().trim(),
+          contact2Relation: (r['Emergency Contact Relation 2']||'').toString().trim(),
+          contact2Phone: (r['Emergency Contact number 2']||'').toString().trim(),
+          managerName: (r['Reporting Manager']||'').toString().trim(),
+          managerPhone: (r['Reporting Manager Number']||'').toString().trim()
+        };
+        count++;
+      });
+
+      if(count === 0){
+        msg.textContent = 'No valid rows with an Employee Code were found.'; msg.className='status-msg err'; return;
+      }
+
+      // Merge (update) rather than overwrite whole tree — preserves status/medical/insurance/photo already set manually.
+      // Mirror the safe subset into public_emergency for each code too, so the QR page picks up the new name/blood group/contacts.
+      const dbUpdates = {};
+      Object.keys(updates).forEach(code=>{
+        const isNew = !(code in employees);
+        // Flatten to per-field paths so this MERGES into the existing node
+        // instead of replacing it — a full-object multi-path update would
+        // silently wipe status/medical/insurance on every re-upload.
+        Object.keys(updates[code]).forEach(k=>{
+          dbUpdates['employees/'+code+'/'+k] = updates[code][k];
+          if(PUBLIC_FIELDS.includes(k)) dbUpdates['public_emergency/'+code+'/'+k] = updates[code][k];
+        });
+        if(isNew){
+          // New employee codes start hidden until you review and activate them —
+          // never public the moment a sheet is uploaded.
+          dbUpdates['employees/'+code+'/status'] = 'Pending';
+          dbUpdates['public_emergency/'+code+'/status'] = 'Pending';
+        }
+      });
+      const ops = [db.ref().update(dbUpdates)];
+      Promise.all(ops).then(()=>{
+        msg.textContent = `Synced ${count} employee record(s) from the sheet. Status, medical, insurance, and photo fields were left untouched.`;
+        msg.className='status-msg ok';
+      }).catch(err=>{
+        msg.textContent = 'Upload failed: '+err.message; msg.className='status-msg err';
+      });
+    }catch(err){
+      msg.textContent = 'Could not read file: '+err.message; msg.className='status-msg err';
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ---------- QR PRINT ----------
+async function printSelected(){
+  const checked = Array.from(document.querySelectorAll('.rowChk:checked')).map(c=>c.dataset.code);
+  const codes = checked.length ? checked : Object.keys(employees);
+  const grid = document.getElementById('printGrid');
+  grid.innerHTML = '';
+  document.getElementById('printArea').classList.remove('hidden');
+  for(const code of codes){
+    const e = employees[code] || {};
+    const url = PUBLIC_BASE_URL + '?id=' + encodeURIComponent(code);
+    const dataUrl = await QRCode.toDataURL(url, {width:220, margin:1});
+    const div = document.createElement('div');
+    div.className = 'qr-card';
+    div.innerHTML = `<img class="qr" src="${dataUrl}"><div class="n">${esc(e.fullName)||code}</div><div class="c">${code}</div>`;
+    grid.appendChild(div);
+  }
+  window.print();
+}
+</script>
+</body>
+</html>
