@@ -164,7 +164,29 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+// QR library loader with fallback mirrors — if one CDN is blocked (ad-blocker,
+// corporate firewall, regional block), this tries the next automatically
+// instead of silently leaving QRCode undefined.
+(function(){
+  var mirrors = [
+    'https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js',
+    'https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js',
+    'https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js'
+  ];
+  function tryNext(i){
+    if(i >= mirrors.length){
+      window.__qrLoadFailed = true;
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = mirrors[i];
+    s.onerror = function(){ tryNext(i+1); };
+    document.head.appendChild(s);
+  }
+  tryNext(0);
+})();
+</script>
 <script>
 // ===== FIREBASE CONFIG — reusing the live OTC Evening Reports project =====
 const firebaseConfig = {
@@ -408,8 +430,15 @@ async function generateQRCodes(){
   statusEl.className = 'status-msg info';
 
   if(typeof QRCode === 'undefined'){
+    // Loader may still be trying fallback mirrors — wait briefly before giving up.
+    statusEl.textContent = 'Loading QR library...';
+    for(let i=0; i<20 && typeof QRCode === 'undefined' && !window.__qrLoadFailed; i++){
+      await new Promise(r=>setTimeout(r, 250));
+    }
+  }
+  if(typeof QRCode === 'undefined'){
     statusEl.className = 'status-msg err';
-    statusEl.textContent = 'QR library failed to load (check your internet connection or ad-blocker, then reload the page).';
+    statusEl.textContent = 'QR library could not load from any source. Check your internet connection, disable any ad-blocker for this page, then reload.';
     document.getElementById('printArea').classList.remove('hidden');
     return;
   }
