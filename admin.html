@@ -45,6 +45,7 @@
     <div id="loginError" style="color:red; font-size:13px; margin-top:6px;"></div>
   </div>
   <button id="signOutBtn" class="secondary" style="display:none;">Sign out</button>
+  <a id="teamDetailsLink" href="team.html" style="display:none; background:#0F6E56; color:#fff; text-decoration:none; padding:10px 16px; border-radius:6px; font-size:14px; margin-left:8px;">Team Details (Emergency ID)</a>
 </div>
 
 <div class="box">
@@ -111,10 +112,12 @@ auth.onAuthStateChanged(user => {
     authStatus.textContent = `Signed in as ${user.email} (UID: ${user.uid})`;
     signInForm.style.display = 'none';
     signOutBtn.style.display = 'inline-block';
+    document.getElementById('teamDetailsLink').style.display = 'inline-block';
   } else {
     authStatus.textContent = 'Not signed in. You must sign in to push data (read-only otherwise).';
     signInForm.style.display = 'block';
     signOutBtn.style.display = 'none';
+    document.getElementById('teamDetailsLink').style.display = 'none';
   }
 });
 
@@ -130,7 +133,7 @@ signInBtn.onclick = async () => {
   }
 };
 signOutBtn.onclick = () => auth.signOut();
-<a id="teamDetailsLink" href="team.html" style="display:none; background:#0F6E56; color:#fff; text-decoration:none; padding:10px 16px; border-radius:6px; font-size:14px; margin-left:8px;">Team Details (Emergency ID)</a>
+
 // ---------- PARSING LOGIC (mirrors parser.py) ----------
 const FIELD_PATTERNS = {
   date:        /(?:date|data)\s*[:\-]*\s*([0-3]?\d[\/\-][01]?\d[\/\-]\d{2,4})/i,
