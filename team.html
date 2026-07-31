@@ -274,6 +274,18 @@ function listenEmployees(){
 
 function esc(s){ return (s||'').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+// Converts a Google Drive share link (e.g. https://drive.google.com/open?id=XXXX
+// or .../file/d/XXXX/view) into a direct-embeddable image URL. Non-Drive URLs
+// (any other image host) pass through unchanged. Requires the file/folder to be
+// shared as "Anyone with the link" in Drive — this only fixes the URL format,
+// it can't override Drive's own privacy setting.
+function driveEmbeddableUrl(url){
+  if(!url) return '';
+  const m = url.match(/[?&]id=([a-zA-Z0-9_-]{15,})/) || url.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
+  if(m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w400';
+  return url; // already a direct image URL (or unrecognized — left as-is)
+}
+
 function renderTable(){
   const q = (document.getElementById('searchBox').value || '').toLowerCase();
   const tbody = document.getElementById('empTbody');
@@ -353,7 +365,7 @@ function saveEmployee(){
     contact2Phone: document.getElementById('f_c2phone').value.trim(),
     managerName: document.getElementById('f_mgrname').value.trim(),
     managerPhone: document.getElementById('f_mgrphone').value.trim(),
-    photoUrl: document.getElementById('f_photo').value.trim(),
+    photoUrl: driveEmbeddableUrl(document.getElementById('f_photo').value.trim()),
     insuranceCompany: document.getElementById('f_insco').value.trim(),
     insurancePolicy: document.getElementById('f_inspolicy').value.trim(),
     insuranceValidity: document.getElementById('f_insvalid').value,
@@ -401,7 +413,8 @@ function processUpload(){
           contact2Relation: (r['Emergency Contact Relation 2']||'').toString().trim(),
           contact2Phone: (r['Emergency Contact number 2']||'').toString().trim(),
           managerName: (r['Reporting Manager']||'').toString().trim(),
-          managerPhone: (r['Reporting Manager Number']||'').toString().trim()
+          managerPhone: (r['Reporting Manager Number']||'').toString().trim(),
+          photoUrl: driveEmbeddableUrl((r['Passport Size Image with white background']||'').toString().trim())
         };
         count++;
       });
