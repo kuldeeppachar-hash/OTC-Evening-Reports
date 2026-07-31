@@ -103,6 +103,7 @@
           <button class="ghost" onclick="openEditModal(null)">+ Add Employee</button>
           <button class="ghost" onclick="generateQRCodes()">Generate QR Codes</button>
           <button class="ghost" onclick="window.print()">Print</button>
+          <button class="ghost" onclick="downloadAllQR()">Download All (ZIP)</button>
         </div>
       </div>
       <div style="overflow-x:auto;margin-top:14px;">
@@ -177,6 +178,25 @@
   function tryNext(i){
     if(i >= mirrors.length){
       window.__qrLoadFailed = true;
+      return;
+    }
+    var s = document.createElement('script');
+    s.src = mirrors[i];
+    s.onerror = function(){ tryNext(i+1); };
+    document.head.appendChild(s);
+  }
+  tryNext(0);
+})();
+
+// Same fallback pattern for JSZip (used by Download All)
+(function(){
+  var mirrors = [
+    'https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js',
+    'https://unpkg.com/jszip@3.10.1/dist/jszip.min.js'
+  ];
+  function tryNext(i){
+    if(i >= mirrors.length){
+      window.__zipLoadFailed = true;
       return;
     }
     var s = document.createElement('script');
@@ -478,6 +498,91 @@ async function generateQRCodes(){
   } else {
     statusEl.className = 'status-msg ok';
     statusEl.textContent = `Generated ${ok} QR code(s). Scroll down to review, then click Print.`;
+  }
+}
+
+async function downloadAllQR(){
+  const statusEl = document.getElementById('qrStatus');
+  statusEl.style.display = 'block';
+  statusEl.className = 'status-msg info';
+  document.getElementById('printArea').classList.remove('hidden');
+
+  if(typeof QRCode === 'undefined'){
+    statusEl.textContent = 'Loading QR library...';
+    for(let i=0; i<20 && typeof QRCode === 'undefined' && !window.__qrLoadFailed; i++){
+      await new Promise(r=>setTimeout(r, 250));
+    }
+  }
+  if(typeof JSZip === 'undefined'){
+    statusEl.textContent = (statusEl.textContent||'') + ' Loading ZIP library...';
+    for(let i=0; i<20 && typeof JSZip === 'undefined' && !window.__zipLoadFailed; i++){
+      await new Promise(r=>setTimeout(r, 250));
+    }
+  }
+  if(typeof QRCode === 'undefined' || typeof JSZip === 'undefined'){
+    statusEl.className = 'status-msg err';
+    statusEl.textContent = 'Could not load required libraries from any source. Check your internet connection, disable any ad-blocker, then reload.';
+    return;
+  }
+
+  const checked = Array.from(document.querySelectorAll('.rowChk:checked')).map(c=>c.dataset.code);
+  const codes = checked.length ? checked : Object.keys(employees);
+  if(!codes.length){
+    statusEl.className = 'status-msg err';
+    statusEl.textContent = 'No employees to export. Check the table above — is it empty?';
+    return;
+  }
+
+  statusEl.textContent = `Building ZIP for ${codes.length} employee(s)...`;
+  const zip = new JSZip();
+  const usedNames = {};
+  let ok = 0, failed = [];
+
+  for(const code of codes){
+    const e = employees[code] || {};
+    const url = PUBLIC_BASE_URL + '?id=' + encodeURIComponent(code);
+    try{
+      const dataUrl = await QRCode.toDataURL(url, {width:400, margin:2});
+      const base64 = dataUrl.split(',')[1];
+      // Build a filesystem-safe filename: CODE_Name.png, de-duplicated if needed
+      let safeName = (code + '_' + (e.fullName||'')).replace(/[^a-zA-Z0-9_\- ]/g,'').trim().replace(/\s+/g,'_');
+      if(!safeName) safeName = code;
+      let finalName = safeName + '.png';
+      let n = 1;
+      while(usedNames[finalName]){ finalName = safeName + '_' + (++n) + '.png'; }
+      usedNames[finalName] = true;
+      zip.file(finalName, base64, {base64:true});
+      ok++;
+    }catch(err){
+      failed.push(code + ': ' + err.message);
+    }
+  }
+
+  if(ok === 0){
+    statusEl.className = 'status-msg err';
+    statusEl.textContent = `Could not generate any QR codes. ${failed.join('; ')}`;
+    return;
+  }
+
+  statusEl.textContent = 'Packaging ZIP file...';
+  try{
+    const blob = await zip.generateAsync({type:'blob'});
+    const a = document.createElement('a');
+    const zipUrl = URL.createObjectURL(blob);
+    a.href = zipUrl;
+    a.download = 'PIL_Emergency_QR_Codes_' + new Date().toISOString().slice(0,10) + '.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(zipUrl), 5000);
+
+    statusEl.className = failed.length ? 'status-msg err' : 'status-msg ok';
+    statusEl.textContent = failed.length
+      ? `Downloaded ${ok} QR code(s). ${failed.length} failed: ${failed.join('; ')}`
+      : `Downloaded ${ok} QR code(s) as a ZIP — one PNG per employee, ready to print individually.`;
+  }catch(err){
+    statusEl.className = 'status-msg err';
+    statusEl.textContent = 'ZIP build failed: ' + err.message;
   }
 }
 </script>
